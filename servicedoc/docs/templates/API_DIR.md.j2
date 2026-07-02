@@ -44,6 +44,29 @@
 {% endif %}
 <!-- @ai:end -->
 
+{% if cls.fields %}
+<!-- @ai:field name="struct" format="go" -->
+**Структура:**
+```go
+type {{ cls.name }}{{ cls.type_params or "" }} struct {
+{% for f in cls.fields %}
+	{{ f.name }} {% if f.type_ref.is_pointer %}*{% endif %}{% if f.type_ref.package %}{{ f.type_ref.package }}.{% endif %}{{ f.type_ref.name }}
+{% endfor %}
+}
+```
+<!-- @ai:end -->
+
+{% set example = json_example_for_name(cls.name) %}
+{% if example %}
+<!-- @ai:field name="example" format="json" -->
+**Пример JSON:**
+```json
+{{ example }}
+```
+<!-- @ai:end -->
+
+{% endif %}
+{% endif %}
 <!-- @ai:field name="source" -->
 **Файл:** {{ make_source_ref(repo_url, branch, cls.file_path, repo_root, cls.line_start, cls.line_end) }}
 <!-- @ai:end -->

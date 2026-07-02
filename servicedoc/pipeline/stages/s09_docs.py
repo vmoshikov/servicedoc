@@ -3,7 +3,12 @@ from datetime import datetime
 from typing import ClassVar
 
 from servicedoc.ai.client import AIClient
-from servicedoc.ai.prompts import RELEASE_NOTES_SYSTEM, RELEASE_NOTES_USER
+from servicedoc.ai.prompts import (
+    README_OVERVIEW_SYSTEM,
+    README_OVERVIEW_USER,
+    RELEASE_NOTES_SYSTEM,
+    RELEASE_NOTES_USER,
+)
 from servicedoc.docs.renderer import MarkdownRenderer
 from servicedoc.git.diff import DiffExtractor
 from servicedoc.git.history import CommitHistory
@@ -105,6 +110,56 @@ class DocumentationStage(Stage):
             except Exception as exc:
                 logger.warning("Release notes error for tag %s: %s", tag, exc)
 
-        docs = await self.renderer.render_all(ctx, release_notes=release_notes)
+        overview = await self._build_overview(ctx, tags)
+
+        docs = await self.renderer.render_all(ctx, release_notes=release_notes, overview=overview)
         logger.info("Generated %d documentation files", len(docs))
         return StageResult(stage_name=self.name, success=True)
+
+    async def _build_overview(self, ctx: PipelineContext, tags: list[str]) -> str | None:
+        """Summarize the public API surface + latest changelog into a short
+        README overview, grounded in ctx.public_symbols / ctx.proto_services /
+        ctx.git_history — no separate parse of the rendered API.md/CHANGELOG.md."""
+        if not self.ai_client:
+            return None
+
+        public_symbols = ctx.public_symbols
+        if not public_symbols and not ctx.proto_services:
+            return None
+
+        api_summary: dict[str, int] = {}
+        for sym in public_symbols:
+            api_summary[sym.kind] = api_summary.get(sym.kind, 0) + 1
+
+        top_dirs: list[str] = []
+        for sym in public_symbols:
+            try:
+                rel = sym.file_path.relative_to(ctx.local_repo_path) if ctx.local_repo_path else sym.file_path
+            except ValueError:
+                rel = sym.file_path
+            parent = str(rel.parent).replace("\\", "/")
+            if parent not in top_dirs:
+                top_dirs.append(parent)
+        top_dirs = top_dirs[:15]
+
+        recent_changes: list[str] = []
+        if tags:
+            latest_tag = tags[-1]
+            recent_changes = [
+                e.message for e in ctx.git_history
+                if e.tag == latest_tag and e.kind in ("feat", "fix")
+            ][:15]
+
+        from jinja2 import Template
+        user_prompt = Template(README_OVERVIEW_USER).render(
+            service_name=ctx.local_repo_path.name if ctx.local_repo_path else "service",
+            api_summary=api_summary,
+            top_dirs=top_dirs,
+            proto_service_names=[s.name for s in ctx.proto_services],
+            recent_changes=recent_changes,
+        )
+        try:
+            return await self.ai_client.complete(README_OVERVIEW_SYSTEM, user_prompt)
+        except Exception as exc:
+            logger.warning("AI README overview failed: %s", exc)
+            return None

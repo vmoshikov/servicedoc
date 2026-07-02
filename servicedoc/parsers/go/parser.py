@@ -229,6 +229,10 @@ class GoParser(LanguageParser):
                 )
                 if struct_body is None:
                     continue
+                type_params_node = next(
+                    (c for c in type_spec_node.children if c.type == "type_parameter_list"), None
+                )
+                type_params = _node_text(type_params_node, source) if type_params_node else None
                 # use the type_spec's own range, not its parent type_declaration:
                 # Go allows grouping several types in one `type ( ... )` block,
                 # where multiple type_specs share the same parent — using the
@@ -243,6 +247,7 @@ class GoParser(LanguageParser):
                     line_end=type_spec_node.end_point[0] + 1,
                     is_public=True,
                     fields=_parse_struct_fields(struct_body, source),
+                    type_params=type_params,
                     comment=comment,
                     needs_ai=comment is None,
                 ))

@@ -112,7 +112,16 @@ class MarkdownRenderer:
                 html_lines.append("&nbsp;" * indent + stripped.replace("|", "\\|"))
             return "<code>" + "<br>".join(html_lines) + "</code>"
 
+        def json_example_for_name(name: str) -> str | None:
+            # plain multi-line JSON for a fenced ```json code block (not a
+            # table cell), looked up directly by type/struct name.
+            example = registry.example_for_type_ref(TypeRef(name=name))
+            if example is None:
+                return None
+            return json.dumps(example, ensure_ascii=False, indent=2)
+
         self.env.globals["json_example"] = json_example
+        self.env.globals["json_example_for_name"] = json_example_for_name
 
     def _render_api_docs(
         self,
@@ -192,6 +201,7 @@ class MarkdownRenderer:
         self,
         ctx: PipelineContext,
         release_notes: list[ReleaseNote] | None = None,
+        overview: str | None = None,
     ) -> list[DocOutput]:
         output_dir = ctx.output_dir
         service_name = _service_name(ctx)
@@ -217,7 +227,7 @@ class MarkdownRenderer:
                 has_tests=bool(ctx.coverage_result),
                 has_er=bool(ctx.er_entities),
                 has_release_notes=bool(release_notes),
-                overview=None,
+                overview=overview,
             ),
             doc_type="readme",
         ))
@@ -255,7 +265,7 @@ class MarkdownRenderer:
         # CHANGELOG
         if ctx.git_history:
             by_tag: dict[str, dict] = {}
-            for tag in ctx.git_tags:
+            for tag in reversed(ctx.git_tags):
                 tag_entries = [e for e in ctx.git_history if e.tag == tag]
                 deduped = deduplicate(tag_entries)
                 grouped = group_entries(deduped)

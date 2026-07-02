@@ -16,10 +16,19 @@ _CONVENTIONAL = re.compile(
     r"(?:\((?P<scope>[^)]+)\))?(?P<breaking>!)?\s*:\s*(?P<msg>.+)$",
     re.IGNORECASE,
 )
+_MD_SPECIAL_CHARS = re.compile(r"([`*_\[\]<>|])")
+
+
+def _sanitize_message(text: str) -> str:
+    """Changelog only cares about the commit subject line — a multi-line
+    body embedded raw breaks the markdown bullet list. Escape characters
+    that would otherwise corrupt formatting once dropped into a bullet."""
+    first_line = text.splitlines()[0] if text else ""
+    return _MD_SPECIAL_CHARS.sub(r"\\\1", first_line.strip())
 
 
 def _parse_commit(commit: git.Commit, tag: str | None = None) -> ChangelogEntry:
-    msg = commit.message.strip()
+    msg = _sanitize_message(commit.message)
     m = _CONVENTIONAL.match(msg)
     if m:
         kind_raw = m.group("kind").lower()

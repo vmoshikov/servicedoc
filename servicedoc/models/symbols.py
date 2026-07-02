@@ -50,3 +50,4 @@ class ClassSymbol(Symbol):
     fields: list[Parameter] = []
     base_classes: list[str] = []
     decorators: list[str] = []
+    type_params: str | None = None  # raw generic parameter list, e.g. "[T comparable]"
