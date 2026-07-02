@@ -7,6 +7,11 @@ PYTHON_EXTENSIONS = frozenset({".py"})
 SOURCE_EXTENSIONS = GO_EXTENSIONS | PYTHON_EXTENSIONS
 TEST_PATTERNS = frozenset({"_test.go", "test_", "_test.py"})
 SKIP_DIRS = frozenset({".git", "vendor", "node_modules", "__pycache__", ".venv", "venv"})
+GENERATED_SUFFIXES = (".pb.go", ".pb.gw.go")
+
+
+def is_generated_file(path: Path) -> bool:
+    return path.name.endswith(GENERATED_SUFFIXES)
 
 
 async def walk_source_files(root: Path, extensions: frozenset[str] | None = None) -> AsyncIterator[Path]:
@@ -16,6 +21,8 @@ async def walk_source_files(root: Path, extensions: frozenset[str] | None = None
         result = []
         for path in root.rglob("*"):
             if any(part in SKIP_DIRS for part in path.parts):
+                continue
+            if is_generated_file(path):
                 continue
             if path.suffix in exts and path.is_file():
                 result.append(path)

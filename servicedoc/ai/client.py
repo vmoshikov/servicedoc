@@ -19,10 +19,13 @@ logger = logging.getLogger(__name__)
 class AIClient:
     def __init__(self, config: AIConfig) -> None:
         self.config = config
+        if not config.verify_ssl:
+            logger.warning("AI client TLS verification disabled (verify_ssl=False) — API key sent over unverified TLS")
         self._http = httpx.AsyncClient(
             base_url=config.base_url,
             headers={"Authorization": f"Bearer {config.api_key}", "Content-Type": "application/json"},
             timeout=120.0,
+            verify=config.verify_ssl,
         )
         self._limiter = TokenBucketRateLimiter(config.rate_limit_rpm)
 

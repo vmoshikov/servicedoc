@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 from collections import defaultdict
 from pathlib import Path
@@ -7,9 +8,10 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from servicedoc.docs.changelog import deduplicate, group_entries
+from servicedoc.docs.json_example import TypeRegistry
 from servicedoc.models.docs import DocOutput, ReleaseNote
 from servicedoc.models.pipeline import PipelineContext
-from servicedoc.models.symbols import Symbol
+from servicedoc.models.symbols import Symbol, TypeRef
 from servicedoc.utils.source_links import make_source_ref
 
 logger = logging.getLogger(__name__)
@@ -73,6 +75,17 @@ class MarkdownRenderer:
 
     def _render(self, template_name: str, **kwargs: object) -> str:
         return self.env.get_template(template_name).render(**kwargs)
+
+    def _set_json_example_global(self, ctx: PipelineContext) -> None:
+        registry = TypeRegistry(ctx)
+
+        def json_example(type_ref: TypeRef) -> str | None:
+            example = registry.example_for_type_ref(type_ref)
+            if example is None:
+                return None
+            return json.dumps(example, ensure_ascii=False, indent=2)
+
+        self.env.globals["json_example"] = json_example
 
     def _render_api_docs(
         self,
@@ -155,6 +168,7 @@ class MarkdownRenderer:
         service_name = _service_name(ctx)
         docs: list[DocOutput] = []
         public_symbols = ctx.public_symbols
+        self._set_json_example_global(ctx)
 
         # README
         docs.append(DocOutput(

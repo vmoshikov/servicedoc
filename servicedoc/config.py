@@ -13,6 +13,10 @@ class AIConfig(BaseSettings):
     rate_limit_rpm: int = 60
     retry_max_attempts: int = 5
     retry_base_delay_seconds: float = 2.0
+    verify_ssl: bool = Field(
+        default=False,
+        description="Verify TLS certs on AI API calls. False sends the API key over unverified TLS.",
+    )
 
 
 class GitConfig(BaseSettings):

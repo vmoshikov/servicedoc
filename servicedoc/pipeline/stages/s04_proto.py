@@ -25,8 +25,9 @@ class ProtoParsingStage(Stage):
         errors: list[str] = []
         for proto_file in proto_files:
             try:
-                services, _messages = parser.parse(proto_file)
+                services, messages = parser.parse(proto_file)
                 ctx.proto_services.extend(services)
+                ctx.proto_messages.extend(messages)
             except Exception as exc:
                 errors.append(f"{proto_file}: {exc}")
                 logger.warning("Proto parse error %s: %s", proto_file, exc)

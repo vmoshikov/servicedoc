@@ -8,11 +8,13 @@ from pydantic import BaseModel, ConfigDict, Field
 from .coverage import CoverageResult
 from .docs import ChangelogEntry
 from .er import EREntity, ERRelation
-from .proto import ProtoService
+from .proto import ProtoMessage, ProtoService
 from .repo import ExternalDep, RepoConfig
 from .symbols import Symbol
 
 T = TypeVar("T")
+
+_PRIVATE_DIR_NAMES = frozenset({"internal", "priv"})
 
 
 class StageResult(BaseModel, Generic[T]):
@@ -38,6 +40,7 @@ class PipelineContext(BaseModel):
     symbols: list[Symbol] = []
     external_deps: list[ExternalDep] = []
     proto_services: list[ProtoService] = []
+    proto_messages: list[ProtoMessage] = []
     er_entities: list[EREntity] = []
     er_relations: list[ERRelation] = []
     er_diagram: str | None = None
@@ -51,4 +54,17 @@ class PipelineContext(BaseModel):
 
     @property
     def public_symbols(self) -> list[Symbol]:
-        return [s for s in self.symbols if s.is_public]
+        root = self.local_repo_path
+        result = []
+        for s in self.symbols:
+            if not s.is_public:
+                continue
+            if root is not None:
+                try:
+                    rel_parts = s.file_path.relative_to(root).parts[:-1]
+                except ValueError:
+                    rel_parts = s.file_path.parts[:-1]
+                if any(part in _PRIVATE_DIR_NAMES for part in rel_parts):
+                    continue
+            result.append(s)
+        return result
