@@ -10,13 +10,17 @@ logger = logging.getLogger(__name__)
 
 
 def parse_url_branch(url: str) -> tuple[str, str | None]:
-    """Extract branch from URL if encoded as 'https://host/repo@branch'."""
-    if "@" in url:
-        # only split on @ after the scheme (avoid splitting user@host patterns)
-        scheme, rest = url.split("://", 1)
-        if "@" in rest:
-            path, branch = rest.rsplit("@", 1)
-            return f"{scheme}://{path}", branch
+    """Extract branch from URL if encoded as '<url>@branch'.
+
+    Only looks for '@' in the final path segment (after the last '/' or ':'),
+    so it doesn't confuse an SSH auth prefix (git@host, ssh://git@host/...)
+    or scp-style syntax (git@host:group/repo.git) with a branch suffix.
+    """
+    last_sep = max(url.rfind("/"), url.rfind(":"))
+    tail = url[last_sep + 1:]
+    if "@" in tail:
+        base, branch = tail.rsplit("@", 1)
+        return url[:last_sep + 1] + base, branch
     return url, None
 
 
@@ -39,6 +43,10 @@ class GitCloner:
         self.cache_dir = cache_dir
 
     def _auth_url(self, url: str) -> str:
+        # token injection only applies to HTTPS; SSH URLs (git@host:...,
+        # ssh://git@host/...) authenticate via the system's SSH agent/keys.
+        if not url.startswith(("http://", "https://")):
+            return url
         if "github.com" in url and self.config.github_token:
             return url.replace("https://", f"https://{self.config.github_token}@")
         if "gitlab" in url and self.config.gitlab_token:

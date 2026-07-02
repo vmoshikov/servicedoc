@@ -14,7 +14,8 @@ from .symbols import Symbol
 
 T = TypeVar("T")
 
-_PRIVATE_DIR_NAMES = frozenset({"internal", "priv"})
+_ALWAYS_PRIVATE_DIR_NAMES = frozenset({"priv"})
+_NESTED_ONLY_PRIVATE_DIR_NAMES = frozenset({"internal"})
 
 
 class StageResult(BaseModel, Generic[T]):
@@ -64,7 +65,12 @@ class PipelineContext(BaseModel):
                     rel_parts = s.file_path.relative_to(root).parts[:-1]
                 except ValueError:
                     rel_parts = s.file_path.parts[:-1]
-                if any(part in _PRIVATE_DIR_NAMES for part in rel_parts):
+                # "internal" only excludes nested occurrences (e.g. pkg/internal/),
+                # not a repo-root-level internal/ — that's where Go convention
+                # puts all application code, not "hide from docs".
+                if any(part in _ALWAYS_PRIVATE_DIR_NAMES for part in rel_parts):
+                    continue
+                if any(part in _NESTED_ONLY_PRIVATE_DIR_NAMES for part in rel_parts[1:]):
                     continue
             result.append(s)
         return result
