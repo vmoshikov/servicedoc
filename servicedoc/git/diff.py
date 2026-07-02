@@ -14,7 +14,10 @@ class DiffExtractor:
             if from_ref:
                 diffs = repo.commit(from_ref).diff(repo.commit(to_ref), create_patch=True)
             else:
-                diffs = repo.commit(to_ref).diff(None, create_patch=True)
+                # first tag: diff against the empty tree, not the working dir,
+                # so the result is "everything present at to_ref" rather than
+                # "to_ref vs whatever HEAD/working tree currently is".
+                diffs = repo.commit(to_ref).diff(git.NULL_TREE, create_patch=True)
             result: dict[str, str] = {}
             for d in diffs:
                 path_key = d.b_path or d.a_path
@@ -28,9 +31,9 @@ class DiffExtractor:
         def _get() -> dict[str, int]:
             repo = git.Repo(self.repo_path)
             if from_ref:
-                diffs = repo.commit(from_ref).diff(repo.commit(to_ref))
+                diffs = repo.commit(from_ref).diff(repo.commit(to_ref), create_patch=True)
             else:
-                diffs = repo.commit(to_ref).diff(None)
+                diffs = repo.commit(to_ref).diff(git.NULL_TREE, create_patch=True)
             added = removed = 0
             file_count = 0
             for d in diffs:

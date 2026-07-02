@@ -32,7 +32,7 @@ class AIClient:
     async def close(self) -> None:
         await self._http.aclose()
 
-    async def complete(self, system: str, user: str) -> str:
+    async def complete(self, system: str, user: str) -> str | None:
         payload = {
             "model": self.config.model,
             "max_tokens": self.config.max_tokens,
@@ -42,7 +42,7 @@ class AIClient:
             ],
         }
 
-        async def _post() -> str:
+        async def _post() -> str | None:
             response = await self._http.post("/v1/chat/completions", json=payload)
             response.raise_for_status()
             data = response.json()
@@ -78,6 +78,9 @@ class AIClient:
         user_prompt = Template(BATCH_DESCRIBE_USER).render(symbols=items, count=len(items))
         try:
             response = await self.complete(BATCH_DESCRIBE_SYSTEM, user_prompt)
+            if not isinstance(response, str):
+                logger.warning("AI batch describe returned empty content (no message.content in response)")
+                return [None] * len(symbols)
             # parse JSON array from response
             start = response.find("[")
             end = response.rfind("]") + 1
