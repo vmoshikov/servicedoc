@@ -1,0 +1,43 @@
+<!-- @ai:document type="api_reference_grpc" service="{{ service_name }}" lang="ru" -->
+# gRPC Сервисы — {{ service_name }}
+
+← [Назад к API]({{ back_link }})
+
+<!-- @ai:section type="toc" -->
+## Содержание
+
+{% for svc in proto_services %}
+- [`{{ svc.name }}`](#{{ make_anchor(svc.name) }})
+{% for method in svc.methods %}
+  - [`{{ method.name }}`](#{{ make_anchor(svc.name + "-" + method.name) }})
+{% endfor %}
+{% endfor %}
+<!-- @ai:end -->
+
+---
+
+{% for svc in proto_services %}
+<!-- @ai:section type="grpc_service" id="{{ svc.name }}" -->
+## {{ svc.name }}
+
+**Источник:** `{{ svc.file_path }}`
+
+{% for method in svc.methods %}
+<!-- @ai:section type="rpc_method" id="{{ svc.name }}-{{ method.name }}" -->
+### {{ method.name }}
+
+<!-- @ai:field name="signature" -->
+```
+rpc {{ method.name }}({% if method.client_streaming %}stream {% endif %}{{ method.input_type }})
+  returns ({% if method.server_streaming %}stream {% endif %}{{ method.output_type }})
+```
+<!-- @ai:end -->
+<!-- @ai:end -->
+
+{% endfor %}
+<!-- @ai:end -->
+
+---
+
+{% endfor %}
+<!-- @ai:end -->

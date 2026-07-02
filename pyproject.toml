@@ -1,0 +1,56 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "servicedoc"
+version = "0.1.0"
+description = "Automated code analysis and documentation generation service"
+requires-python = ">=3.12"
+dependencies = [
+    "tree-sitter>=0.23",
+    "tree-sitter-go>=0.23",
+    "tree-sitter-python>=0.23",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "gitpython>=3.1",
+    "httpx[asyncio]>=0.27",
+    "Jinja2>=3.1",
+    "typer>=0.12",
+]
+
+[project.optional-dependencies]
+api = [
+    "fastapi>=0.111",
+    "uvicorn>=0.30",
+]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=5",
+    "respx>=0.21",
+    "ruff>=0.4",
+    "mypy>=1.10",
+]
+
+[project.scripts]
+servicedoc = "servicedoc.main:app"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+    "integration: requires network access and optionally AI API",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+ignore_missing_imports = true

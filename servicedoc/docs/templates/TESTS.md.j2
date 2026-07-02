@@ -1,0 +1,36 @@
+<!-- @ai:document type="test_report" service="{{ service_name }}" lang="ru" -->
+# Тесты — {{ service_name }}
+
+## Покрытие кода
+
+{% if coverage %}
+<!-- @ai:section type="coverage_summary" -->
+| Метрика | Значение |
+|---|---|
+| Общее покрытие | **{{ coverage.overall_pct }}%** |
+| Покрытых строк | {{ coverage.covered_lines }} |
+| Всего строк | {{ coverage.total_lines }} |
+| Источник отчёта | `{{ coverage.report_source }}` |
+<!-- @ai:end -->
+{% else %}
+<!-- @ai:section type="coverage_summary" -->
+> Отчёт о покрытии не найден. Запустите тесты с флагом покрытия:
+> - Python: `pytest --cov=. --cov-report=xml`
+> - Go: `go test ./... -coverprofile=coverage.out`
+<!-- @ai:end -->
+{% endif %}
+
+## Тестовые файлы
+
+<!-- @ai:section type="test_files" -->
+{% if test_files %}
+| Файл | Язык |
+|---|---|
+{% for tf in test_files %}
+| `{{ tf.path }}` | {{ tf.language }} |
+{% endfor %}
+{% else %}
+> Тестовые файлы не обнаружены.
+{% endif %}
+<!-- @ai:end -->
+<!-- @ai:end -->

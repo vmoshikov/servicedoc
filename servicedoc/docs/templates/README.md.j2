@@ -1,0 +1,57 @@
+<!-- @ai:document type="service_readme" service="{{ service_name }}" version="{{ version }}" lang="ru" -->
+# {{ service_name }}
+
+<!-- @ai:section type="overview" -->
+{% if overview %}
+{{ overview }}
+{% else %}
+> Описание отсутствует. Добавьте комментарии к основным функциям или классам.
+{% endif %}
+
+| Характеристика | Значение |
+|---|---|
+| Язык | {{ detected_language | title }} |
+| Публичных символов | {{ public_symbol_count }} |
+| Proto сервисов | {{ proto_service_count }} |
+| Тестовых файлов | {{ test_file_count }} |
+{% if coverage_pct is not none %}
+| Покрытие тестами | {{ coverage_pct }}% |
+{% endif %}
+| Внешних зависимостей | {{ external_dep_count }} |
+<!-- @ai:end -->
+
+## Содержание
+
+- [API](./API.md) — публичные методы, функции и классы с типами запросов/ответов
+{% if has_proto %}
+- [Proto API](./PROTO.md) — gRPC сервисы и сообщения
+{% endif %}
+{% if has_tests %}
+- [Тесты](./TESTS.md) — покрытие и список тестовых файлов
+{% endif %}
+{% if has_er %}
+- [ER-диаграмма](./ER.md) — схема базы данных
+{% endif %}
+- [CHANGELOG](./CHANGELOG.md) — история изменений по тегам
+{% if has_release_notes %}
+- [Release Notes](./RELEASE_NOTES/) — детальные заметки к каждому релизу
+{% endif %}
+
+{% if external_deps %}
+## Внешние зависимости
+
+<!-- @ai:section type="external_deps" -->
+| Репозиторий | Версия | Импортируемые пакеты |
+|---|---|---|
+{% for dep in external_deps %}
+| {{ dep.dependency.name }} | {{ dep.dependency.version }} | {{ dep.imported_symbols | join(", ") }} |
+{% endfor %}
+<!-- @ai:end -->
+{% endif %}
+
+{% if has_er %}
+## Архитектура базы данных
+
+ER-диаграмма сервиса — см. [ER.md](./ER.md).
+{% endif %}
+<!-- @ai:end -->

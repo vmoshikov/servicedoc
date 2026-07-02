@@ -1,0 +1,110 @@
+<!-- @ai:document type="api_reference_dir" service="{{ service_name }}" dir="{{ dir_name }}" lang="ru" -->
+# {{ dir_name }}/ — {{ service_name }}
+
+← [Назад к API]({{ back_link }})
+
+<!-- @ai:section type="toc" -->
+## Содержание
+
+{% set all_sorted = symbols | sort(attribute="name") %}
+{% set classes_sorted = all_sorted | selectattr("kind", "in", ["class", "struct", "interface"]) | list %}
+{% set funcs_sorted = all_sorted | selectattr("kind", "in", ["function", "method"]) | list %}
+{% if classes_sorted %}
+**Классы и структуры**
+{% for cls in classes_sorted %}
+- [`{{ cls.name }}`](#{{ make_anchor(cls.name) }})
+{% endfor %}
+
+{% endif %}
+{% if funcs_sorted %}
+**Функции и методы**
+{% for sym in funcs_sorted %}
+- [`{{ sym.name }}`](#{{ make_anchor(sym.name) }}){% if sym.receiver %} `{{ sym.receiver }}`{% endif %}
+
+{% endfor %}
+{% endif %}
+<!-- @ai:end -->
+
+---
+
+{% if classes_sorted %}
+{% for cls in classes_sorted %}
+<!-- @ai:section type="class" id="{{ cls.name }}" -->
+## {{ cls.name }}
+
+<!-- @ai:field name="description" -->
+{% if cls.comment %}
+{{ cls.comment }}
+{% elif cls.ai_description %}
+{{ cls.ai_description }}
+
+> ⚠️ *Источник: AI-анализ (комментарий разработчика отсутствует)*
+{% else %}
+> Описание недоступно.
+{% endif %}
+<!-- @ai:end -->
+
+<!-- @ai:field name="source" -->
+**Файл:** {{ make_source_ref(repo_url, branch, cls.file_path, repo_root, cls.line_start, cls.line_end) }}
+<!-- @ai:end -->
+{% if cls.base_classes %}
+
+<!-- @ai:field name="bases" -->
+**Наследует:** {{ cls.base_classes | join(", ") }}
+<!-- @ai:end -->
+{% endif %}
+<!-- @ai:end -->
+
+---
+
+{% endfor %}
+{% endif %}
+
+{% if funcs_sorted %}
+{% for sym in funcs_sorted %}
+<!-- @ai:section type="{{ sym.kind }}" id="{{ sym.name }}" -->
+## {{ sym.name }}{% if sym.receiver %} `{{ sym.receiver }}`{% endif %}
+
+<!-- @ai:field name="description" -->
+{% if sym.comment %}
+{{ sym.comment }}
+{% elif sym.ai_description %}
+{{ sym.ai_description }}
+
+> ⚠️ *Источник: AI-анализ (комментарий разработчика отсутствует)*
+{% else %}
+> Описание недоступно.
+{% endif %}
+<!-- @ai:end -->
+
+{% if sym.parameters %}
+<!-- @ai:field name="parameters" format="table" -->
+| Параметр | Тип |
+|---|---|
+{% for p in sym.parameters %}
+| `{{ p.name }}` | `{{ p.type_ref.name }}{% if p.type_ref.is_pointer %}*{% endif %}` |
+{% endfor %}
+<!-- @ai:end -->
+
+{% endif %}
+{% if sym.return_types %}
+<!-- @ai:field name="returns" format="table" -->
+| Возвращает | Тип |
+|---|---|
+{% for r in sym.return_types %}
+| — | `{{ r.name }}{% if r.is_pointer %}*{% endif %}` |
+{% endfor %}
+<!-- @ai:end -->
+
+{% endif %}
+<!-- @ai:field name="source" -->
+**Файл:** {{ make_source_ref(repo_url, branch, sym.file_path, repo_root, sym.line_start, sym.line_end) }}
+<!-- @ai:end -->
+<!-- @ai:end -->
+
+---
+
+{% endfor %}
+{% endif %}
+
+<!-- @ai:end -->

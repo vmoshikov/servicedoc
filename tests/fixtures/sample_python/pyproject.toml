@@ -1,0 +1,9 @@
+[project]
+name = "sample-service"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.111",
+    "sqlalchemy>=2.0",
+    "pydantic>=2.0",
+]

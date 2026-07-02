@@ -1,0 +1,15 @@
+<!-- @ai:document type="api_reference_index" service="{{ service_name }}" lang="ru" -->
+# API — {{ service_name }}
+
+<!-- @ai:section type="toc" -->
+## Содержание
+
+{% for dir_name, dir_file in dir_files.items() %}
+- [`{{ dir_name }}/`]({{ dir_file }}) — {{ dir_counts[dir_name] }} символов
+{% endfor %}
+{% if proto_services %}
+- [gRPC Сервисы](api/grpc.md) — {{ proto_services | length }} сервисов
+{% endif %}
+<!-- @ai:end -->
+
+<!-- @ai:end -->

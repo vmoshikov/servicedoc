@@ -1,0 +1,78 @@
+<!-- @ai:document type="release_notes" service="{{ service_name }}" version="{{ note.tag }}" lang="ru" -->
+# Release Notes — {{ note.tag }}
+
+**Дата:** {{ note.date.strftime("%Y-%m-%d") }} | **Тег:** `{{ note.tag }}`{% if note.prev_tag %} | **Предыдущий:** `{{ note.prev_tag }}`{% endif %}
+
+{% if note.ai_summary %}
+<!-- @ai:section type="ai_summary" -->
+## Обзор изменений
+
+{{ note.ai_summary }}
+<!-- @ai:end -->
+{% endif %}
+
+<!-- @ai:section type="diff_stats" -->
+## Статистика изменений
+
+| Метрика | Значение |
+|---|---|
+| Файлов изменено | {{ note.changed_files_count }} |
+| Строк добавлено | +{{ note.added_lines }} |
+| Строк удалено | -{{ note.removed_lines }} |
+<!-- @ai:end -->
+
+{% set breaking = note.changelog_entries | selectattr("breaking") | list %}
+{% set feats = note.changelog_entries | selectattr("kind", "equalto", "feat") | list %}
+{% set fixes = note.changelog_entries | selectattr("kind", "equalto", "fix") | list %}
+{% set others = note.changelog_entries | rejectattr("breaking") | rejectattr("kind", "in", ["feat", "fix"]) | list %}
+
+{% if breaking %}
+<!-- @ai:section type="breaking_changes" -->
+## ⚠️ Критические изменения
+
+{% for entry in breaking %}
+- **{{ entry.message }}** (`{{ entry.sha }}`)
+{% endfor %}
+<!-- @ai:end -->
+{% endif %}
+
+{% if feats %}
+<!-- @ai:section type="new_features" -->
+## Новые возможности
+
+{% for entry in feats %}
+- {{ entry.message }}{% if entry.scope %} (`{{ entry.scope }}`){% endif %} — `{{ entry.sha }}`
+{% endfor %}
+<!-- @ai:end -->
+{% endif %}
+
+{% if fixes %}
+<!-- @ai:section type="bug_fixes" -->
+## Исправления
+
+{% for entry in fixes %}
+- {{ entry.message }} — `{{ entry.sha }}`
+{% endfor %}
+<!-- @ai:end -->
+{% endif %}
+
+{% if others %}
+<!-- @ai:section type="other_changes" -->
+## Прочие изменения
+
+{% for entry in others %}
+- [{{ entry.kind }}] {{ entry.message }} — `{{ entry.sha }}`
+{% endfor %}
+<!-- @ai:end -->
+{% endif %}
+
+{% if note.changed_symbols %}
+<!-- @ai:section type="changed_symbols" -->
+## Изменённые публичные символы
+
+{% for sym in note.changed_symbols %}
+- `{{ sym }}`
+{% endfor %}
+<!-- @ai:end -->
+{% endif %}
+<!-- @ai:end -->

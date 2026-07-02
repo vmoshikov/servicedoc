@@ -1,0 +1,52 @@
+<!-- @ai:document type="changelog" service="{{ service_name }}" lang="ru" -->
+# CHANGELOG — {{ service_name }}
+
+Все значимые изменения фиксируются в этом файле.
+Формат: [Keep a Changelog](https://keepachangelog.com/ru/1.0.0/).
+
+{% for tag, groups in changelog_by_tag.items() %}
+## {{ tag }}
+
+{% if groups.get("breaking") %}
+### ⚠️ Критические изменения
+
+{% for entry in groups["breaking"] %}
+- **{{ entry.message }}** *({{ entry.sha }}){% if entry.scope %} — `{{ entry.scope }}`{% endif %}*
+{% endfor %}
+
+{% endif %}
+{% if groups.get("feat") %}
+### Новые возможности
+
+{% for entry in groups["feat"] %}
+- {{ entry.message }} *({{ entry.sha }}){% if entry.scope %} — `{{ entry.scope }}`{% endif %}*
+{% endfor %}
+
+{% endif %}
+{% if groups.get("fix") %}
+### Исправления
+
+{% for entry in groups["fix"] %}
+- {{ entry.message }} *({{ entry.sha }})*
+{% endfor %}
+
+{% endif %}
+{% if groups.get("refactor") %}
+### Рефакторинг
+
+{% for entry in groups["refactor"] %}
+- {{ entry.message }} *({{ entry.sha }})*
+{% endfor %}
+
+{% endif %}
+{% if groups.get("other") %}
+### Прочее
+
+{% for entry in groups["other"] %}
+- {{ entry.message }} *({{ entry.sha }})*
+{% endfor %}
+
+{% endif %}
+---
+{% endfor %}
+<!-- @ai:end -->

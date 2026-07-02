@@ -1,0 +1,33 @@
+<!-- @ai:document type="er_diagram" service="{{ service_name }}" lang="ru" -->
+# ER-диаграмма — {{ service_name }}
+
+<!-- @ai:section type="er_diagram" format="plantuml" -->
+```plantuml
+{{ er_diagram }}
+```
+<!-- @ai:end -->
+
+## Таблицы
+
+{% for entity in entities %}
+<!-- @ai:section type="table_description" id="{{ entity.effective_table_name }}" -->
+### {{ entity.effective_table_name }}
+
+{% if entity.fields %}
+| Поле | Тип | Ключ |
+|---|---|---|
+{% for field in entity.fields %}
+| `{{ field.name }}` | {{ field.type }} | {% if field.kind.value %}{{ field.kind.value }}{% endif %} |
+{% endfor %}
+{% else %}
+> Поля не определены (таблица обнаружена из raw SQL).
+{% endif %}
+
+**ORM:** {{ entity.orm_type }} | **Источник:** `{{ entity.source_file }}`
+{% if entity.orm_type == "raw_sql" %}
+> ⚠️ *Таблица обнаружена из SQL-запроса — структура может быть неполной.*
+{% endif %}
+<!-- @ai:end -->
+
+{% endfor %}
+<!-- @ai:end -->
