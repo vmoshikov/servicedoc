@@ -3,6 +3,7 @@ import logging
 from typing import ClassVar
 
 from servicedoc.ai.client import AIClient
+from servicedoc.docs.regenerate_markers import scan_regenerate_markers
 from servicedoc.models.pipeline import PipelineContext, StageResult
 from servicedoc.pipeline.base import Stage
 from servicedoc.utils.manifest import SymbolManifest
@@ -24,6 +25,16 @@ class AIEnrichmentStage(Stage):
         self.semaphore = asyncio.Semaphore(max_concurrent)
 
     async def run(self, ctx: PipelineContext) -> StageResult:
+        # symbols marked with `<!-- @ai:regenerate -->` in a previously
+        # generated .md file get their AI description force-refreshed,
+        # bypassing the manifest cache (comment-authored symbols are left
+        # alone — a hand-written doc comment always wins over ai_description).
+        forced_names = scan_regenerate_markers(ctx.output_dir)
+        if forced_names:
+            for sym in ctx.symbols:
+                if sym.name in forced_names and sym.comment is None:
+                    sym.needs_ai = True
+
         needs_ai = [s for s in ctx.symbols if s.needs_ai]
         if not needs_ai:
             return StageResult(stage_name=self.name, success=True)
@@ -45,7 +56,7 @@ class AIEnrichmentStage(Stage):
         for sym in needs_ai:
             src = source_map.get(sym.file_path, b"")
             key = manifest.make_key(sym.file_path, sym.line_start, sym.line_end, src)
-            cached = manifest.get(key)
+            cached = None if sym.name in forced_names else manifest.get(key)
             if cached:
                 sym.ai_description = cached
                 sym.needs_ai = False

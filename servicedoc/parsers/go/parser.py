@@ -229,14 +229,18 @@ class GoParser(LanguageParser):
                 )
                 if struct_body is None:
                     continue
-                decl_node = type_spec_node.parent or type_spec_node
-                comment = _extract_comment_above(source_lines, decl_node.start_point[0])
+                # use the type_spec's own range, not its parent type_declaration:
+                # Go allows grouping several types in one `type ( ... )` block,
+                # where multiple type_specs share the same parent — using the
+                # parent would give every struct in the group identical
+                # line_start/line_end (and thus identical code sent to the AI).
+                comment = _extract_comment_above(source_lines, type_spec_node.start_point[0])
                 symbols.append(ClassSymbol(
                     name=name,
                     kind="struct",
                     file_path=path,
-                    line_start=decl_node.start_point[0] + 1,
-                    line_end=decl_node.end_point[0] + 1,
+                    line_start=type_spec_node.start_point[0] + 1,
+                    line_end=type_spec_node.end_point[0] + 1,
                     is_public=True,
                     fields=_parse_struct_fields(struct_body, source),
                     comment=comment,

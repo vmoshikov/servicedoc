@@ -36,7 +36,7 @@ class TypeRegistry:
 
 
 def _resolve(type_name: str, registry: TypeRegistry, seen: frozenset[str], depth: int = 0) -> object | None:
-    type_name = type_name.strip()
+    type_name = type_name.strip().lstrip("*")
 
     if depth > _MAX_DEPTH:
         return None

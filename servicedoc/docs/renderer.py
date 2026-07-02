@@ -63,6 +63,23 @@ def _back_link(file_path: str) -> str:
     return "../" * depth + "API.md"
 
 
+_NAV_CATEGORY_ORDER = ["core", "app", "entity", "usecase", "provider", "controller"]
+_NAV_OTHER_LABEL = "Прочее"
+
+
+def _categorize_dirs(dir_names: list[str]) -> dict[str, list[str]]:
+    """Group directory names into architecture-layer buckets by matching any
+    path segment against the known category names; unmatched dirs go last
+    under _NAV_OTHER_LABEL."""
+    categories = {name: [] for name in _NAV_CATEGORY_ORDER}
+    categories[_NAV_OTHER_LABEL] = []
+    for dir_name in dir_names:
+        parts = dir_name.split("/")
+        matched = next((c for c in _NAV_CATEGORY_ORDER if c in parts), None)
+        categories[(matched or _NAV_OTHER_LABEL)].append(dir_name)
+    return {k: sorted(v) for k, v in categories.items() if v}
+
+
 class MarkdownRenderer:
     def __init__(self) -> None:
         self.env = Environment(
@@ -83,7 +100,17 @@ class MarkdownRenderer:
             example = registry.example_for_type_ref(type_ref)
             if example is None:
                 return None
-            return json.dumps(example, ensure_ascii=False, indent=2)
+            # markdown table cells can't contain real newlines, so a
+            # pretty-printed example is rendered as raw HTML: indentation
+            # becomes &nbsp; and line breaks become <br>, wrapped in <code>
+            # so it still reads like formatted JSON inside the cell.
+            pretty = json.dumps(example, ensure_ascii=False, indent=2)
+            html_lines = []
+            for line in pretty.split("\n"):
+                stripped = line.lstrip(" ")
+                indent = len(line) - len(stripped)
+                html_lines.append("&nbsp;" * indent + stripped.replace("|", "\\|"))
+            return "<code>" + "<br>".join(html_lines) + "</code>"
 
         self.env.globals["json_example"] = json_example
 
@@ -107,11 +134,13 @@ class MarkdownRenderer:
         dir_counts: dict[str, int] = {
             dir_name: len(syms) for dir_name, syms in symbol_groups.items()
         }
+        nav_categories = _categorize_dirs(list(symbol_groups.keys()))
 
         # API.md — index only
         index_content = self._render(
             "API.md.j2",
             service_name=service_name,
+            nav_categories=nav_categories,
             dir_files=dir_files,
             dir_counts=dir_counts,
             proto_services=ctx.proto_services,

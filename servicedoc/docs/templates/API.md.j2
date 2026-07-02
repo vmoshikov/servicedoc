@@ -4,8 +4,13 @@
 <!-- @ai:section type="toc" -->
 ## Содержание
 
-{% for dir_name, dir_file in dir_files.items() %}
-- [`{{ dir_name }}/`]({{ dir_file }}) — {{ dir_counts[dir_name] }} символов
+{% for category, dirs in nav_categories.items() %}
+### {{ category }}
+
+{% for dir_name in dirs %}
+- [`{{ dir_name }}/`]({{ dir_files[dir_name] }}) — {{ dir_counts[dir_name] }} символов
+{% endfor %}
+
 {% endfor %}
 {% if proto_services %}
 - [gRPC Сервисы](api/grpc.md) — {{ proto_services | length }} сервисов

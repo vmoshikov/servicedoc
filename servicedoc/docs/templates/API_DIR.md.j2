@@ -79,47 +79,25 @@
 
 {% if sym.parameters %}
 <!-- @ai:field name="parameters" format="table" -->
-| Параметр | Тип |
-|---|---|
-{% for p in sym.parameters %}
-| `{{ p.name }}` | `{{ p.type_ref.name }}{% if p.type_ref.is_pointer %}*{% endif %}` |
-{% endfor %}
-<!-- @ai:end -->
-
+| Параметр | Тип | Пример |
+|---|---|---|
 {% for p in sym.parameters %}
 {% set example = json_example(p.type_ref) %}
-{% if example %}
-<!-- @ai:field name="example_{{ p.name }}" format="json" -->
-**Пример `{{ p.name }}` (`{{ p.type_ref.name }}`):**
-```json
-{{ example }}
-```
+| `{{ p.name }}` | `{{ p.type_ref.name }}{% if p.type_ref.is_pointer %}*{% endif %}` | {% if example %}{{ example }}{% else %}—{% endif %} |
+{% endfor %}
 <!-- @ai:end -->
 
-{% endif %}
-{% endfor %}
 {% endif %}
 {% if sym.return_types %}
 <!-- @ai:field name="returns" format="table" -->
-| Возвращает | Тип |
-|---|---|
-{% for r in sym.return_types %}
-| — | `{{ r.name }}{% if r.is_pointer %}*{% endif %}` |
-{% endfor %}
-<!-- @ai:end -->
-
+| Возвращает | Тип | Пример |
+|---|---|---|
 {% for r in sym.return_types %}
 {% set example = json_example(r) %}
-{% if example %}
-<!-- @ai:field name="example_return_{{ r.name }}" format="json" -->
-**Пример возвращаемого значения (`{{ r.name }}`):**
-```json
-{{ example }}
-```
+| — | `{{ r.name }}{% if r.is_pointer %}*{% endif %}` | {% if example %}{{ example }}{% else %}—{% endif %} |
+{% endfor %}
 <!-- @ai:end -->
 
-{% endif %}
-{% endfor %}
 {% endif %}
 <!-- @ai:field name="source" -->
 **Файл:** {{ make_source_ref(repo_url, branch, sym.file_path, repo_root, sym.line_start, sym.line_end) }}
