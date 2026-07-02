@@ -36,6 +36,13 @@ class AIClient:
         payload = {
             "model": self.config.model,
             "max_tokens": self.config.max_tokens,
+            # reasoning models (o1/o3, Qwen3-thinking, ...) burn tokens on
+            # hidden chain-of-thought before any visible content; some
+            # OpenAI-compatible gateways only honor the newer
+            # max_completion_tokens field and silently fall back to a tiny
+            # default (e.g. 256) for max_tokens, which the reasoning budget
+            # alone exhausts. Send both so either field name is respected.
+            "max_completion_tokens": self.config.max_tokens,
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
@@ -46,7 +53,24 @@ class AIClient:
             response = await self._http.post("/v1/chat/completions", json=payload)
             response.raise_for_status()
             data = response.json()
-            return data["choices"][0]["message"]["content"]
+            message = data["choices"][0]["message"]
+            content = message.get("content")
+            if content is None:
+                finish_reason = data["choices"][0].get("finish_reason")
+                if finish_reason == "length" and message.get("reasoning_content"):
+                    logger.warning(
+                        "message.content is null: reasoning model exhausted the token "
+                        "budget on reasoning_content before producing an answer "
+                        "(finish_reason=length). Raise AIConfig.max_tokens."
+                    )
+                else:
+                    logger.warning(
+                        "message.content is null, finish_reason=%r, message keys=%s, raw message=%s",
+                        finish_reason,
+                        list(message.keys()),
+                        message,
+                    )
+            return content
 
         await self._limiter.acquire()
         return await retry_async(
