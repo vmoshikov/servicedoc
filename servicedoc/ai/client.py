@@ -43,6 +43,12 @@ class AIClient:
             # default (e.g. 256) for max_tokens, which the reasoning budget
             # alone exhausts. Send both so either field name is respected.
             "max_completion_tokens": self.config.max_tokens,
+            # Qwen3-thinking (served via vLLM/SGLang) burns the whole token
+            # budget on hidden reasoning before ever emitting `content`.
+            # Both fields below disable that reasoning pass; unsupported
+            # backends just ignore unknown keys.
+            "enable_thinking": False,
+            "chat_template_kwargs": {"enable_thinking": False},
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
