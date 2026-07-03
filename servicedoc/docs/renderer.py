@@ -234,6 +234,7 @@ class MarkdownRenderer:
         index_filename: str,
         title: str,
         doc_type: str,
+        title_emoji: str = "",
     ) -> list[DocOutput]:
         """Generic: index + one file per directory for a symbol subset
         (funcs-only for FUNCTIONS.md, structs-only for STRUCTURES.md)."""
@@ -249,6 +250,7 @@ class MarkdownRenderer:
             "SYMBOL_INDEX.md.j2",
             service_name=service_name,
             title=title,
+            title_emoji=title_emoji,
             doc_type=doc_type,
             nav_categories=nav_categories,
             dir_files=dir_files,
@@ -310,7 +312,7 @@ class MarkdownRenderer:
                 detected_language=ctx.detected_language or "unknown",
                 public_symbol_count=len(public_symbols),
                 proto_service_count=len(ctx.proto_services),
-                test_file_count=len(ctx.coverage_result.test_files) if ctx.coverage_result else 0,
+                test_file_count=len(ctx.detected_test_files),
                 coverage_pct=ctx.coverage_result.overall_pct if ctx.coverage_result else None,
                 external_dep_count=len(ctx.external_deps),
                 external_deps=ctx.external_deps,
@@ -334,6 +336,7 @@ class MarkdownRenderer:
             index_filename="FUNCTIONS.md",
             title="Функции и методы",
             doc_type="functions",
+            title_emoji="⚙️",
         ))
 
         # STRUCTURES.md — all public structs/classes/interfaces, dir-based
@@ -344,11 +347,11 @@ class MarkdownRenderer:
             index_filename="STRUCTURES.md",
             title="Структуры",
             doc_type="structures",
+            title_emoji="🧱",
         ))
 
         # TESTS
-        raw_test_files = ctx.coverage_result.test_files if ctx.coverage_result else []
-        sorted_test_files = sorted(raw_test_files, key=lambda tf: str(tf.path).lower())
+        sorted_test_files = sorted(ctx.detected_test_files, key=lambda tf: str(tf.path).lower())
         docs.append(DocOutput(
             path=output_dir / "TESTS.md",
             content=self._render(
@@ -356,6 +359,7 @@ class MarkdownRenderer:
                 service_name=service_name,
                 coverage=ctx.coverage_result,
                 test_files=sorted_test_files,
+                test_match_report=ctx.test_match_report,
             ),
             doc_type="tests",
         ))

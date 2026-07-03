@@ -1,7 +1,7 @@
 <!-- @ai:document type="test_report" service="{{ service_name }}" lang="ru" -->
-# Тесты — {{ service_name }}
+# 🧪 Тесты — {{ service_name }}
 
-## Покрытие кода
+## 📊 Покрытие кода
 
 {% if coverage %}
 <!-- @ai:section type="coverage_summary" -->
@@ -20,7 +20,40 @@
 <!-- @ai:end -->
 {% endif %}
 
-## Тестовые файлы
+## 🎯 Точечное покрытие функций тестами
+
+{% if test_match_report %}
+<!-- @ai:section type="test_match_summary" -->
+| Метрика | Значение |
+|---|---|
+| Функций с именным тестом | {{ test_match_report.covered_function_count }} / {{ test_match_report.total_function_count }} (**{{ test_match_report.coverage_pct }}%**) |
+| Тестов без привязки к функции | {{ test_match_report.unmatched_tests | length }} |
+<!-- @ai:end -->
+
+{% if test_match_report.matches %}
+<!-- @ai:section type="test_matches" format="table" -->
+| Функция | Тесты |
+|---|---|
+{% for m in test_match_report.matches | sort(attribute="function_name") %}
+| `{{ m.function_name }}` | {{ m.test_names | join(", ") }} |
+{% endfor %}
+<!-- @ai:end -->
+{% endif %}
+
+{% if test_match_report.unmatched_tests %}
+### 🧩 Общие тесты (без привязки к конкретной функции)
+
+<!-- @ai:section type="unmatched_tests" -->
+{% for t in test_match_report.unmatched_tests | sort %}
+- `{{ t }}`
+{% endfor %}
+<!-- @ai:end -->
+{% endif %}
+{% else %}
+> Сопоставление тестов с функциями не выполнено.
+{% endif %}
+
+## 📁 Тестовые файлы
 
 <!-- @ai:section type="test_files" -->
 {% if test_files %}

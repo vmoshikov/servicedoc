@@ -1,11 +1,11 @@
 <!-- @ai:document type="changelog" service="{{ service_name }}" lang="ru" -->
-# CHANGELOG — {{ service_name }}
+# 📝 CHANGELOG — {{ service_name }}
 
 Все значимые изменения фиксируются в этом файле.
 Формат: [Keep a Changelog](https://keepachangelog.com/ru/1.0.0/).
 
 {% for tag, groups in changelog_by_tag.items() %}
-## {{ tag }}
+## 🏷️ {{ tag }}
 
 {% if groups.get("breaking") %}
 ### ⚠️ Критические изменения
@@ -16,7 +16,7 @@
 
 {% endif %}
 {% if groups.get("feat") %}
-### Новые возможности
+### ✨ Новые возможности
 
 {% for entry in groups["feat"] %}
 - {{ entry.message }} *({{ entry.sha }}){% if entry.scope %} — `{{ entry.scope }}`{% endif %}*
@@ -24,7 +24,7 @@
 
 {% endif %}
 {% if groups.get("fix") %}
-### Исправления
+### 🐛 Исправления
 
 {% for entry in groups["fix"] %}
 - {{ entry.message }} *({{ entry.sha }})*
@@ -32,7 +32,7 @@
 
 {% endif %}
 {% if groups.get("refactor") %}
-### Рефакторинг
+### 🔧 Рефакторинг
 
 {% for entry in groups["refactor"] %}
 - {{ entry.message }} *({{ entry.sha }})*
@@ -40,7 +40,7 @@
 
 {% endif %}
 {% if groups.get("other") %}
-### Прочее
+### 📦 Прочее
 
 {% for entry in groups["other"] %}
 - {{ entry.message }} *({{ entry.sha }})*

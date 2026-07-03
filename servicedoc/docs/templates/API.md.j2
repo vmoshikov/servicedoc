@@ -1,17 +1,18 @@
 <!-- @ai:document type="api_reference" service="{{ service_name }}" lang="ru" -->
-# API — {{ service_name }}
+# 🔌 API — {{ service_name }}
 
 Только объекты, определённые в .proto-контрактах (gRPC-сервисы и сообщения).
 Остальной код сервиса — см. [FUNCTIONS.md](./FUNCTIONS.md) и [STRUCTURES.md](./STRUCTURES.md).
 
+{% set group_emoji = {"public": "🌐", "private": "🔒"} %}
 <!-- @ai:section type="toc" -->
-## Содержание
+## 🧭 Содержание
 
 {% for group, content in proto_groups.items() %}
-### {{ group }}
+### {{ group_emoji.get(group, "📁") }} {{ group }}
 
 {% if content.services %}
-**gRPC сервисы**
+**📡 gRPC сервисы**
 {% for svc in content.services %}
 - [`{{ svc.name }}`](#{{ make_anchor(group + "-" + svc.name) }})
 {% for method in svc.methods %}
@@ -21,7 +22,7 @@
 
 {% endif %}
 {% if content.messages %}
-**Сообщения**
+**📨 Сообщения**
 {% for msg in content.messages %}
 - [`{{ msg.name }}`](#{{ make_anchor(group + "-" + msg.name) }})
 {% endfor %}
@@ -33,7 +34,7 @@
 ---
 
 {% for group, content in proto_groups.items() %}
-## {{ group }}
+## {{ group_emoji.get(group, "📁") }} {{ group }}
 
 {% for svc in content.services %}
 <!-- @ai:section type="grpc_service" id="{{ group }}-{{ svc.name }}" -->

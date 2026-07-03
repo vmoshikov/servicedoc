@@ -1,18 +1,18 @@
 <!-- @ai:document type="release_notes" service="{{ service_name }}" version="{{ note.tag }}" lang="ru" -->
-# Release Notes — {{ note.tag }}
+# 📦 Release Notes — {{ note.tag }}
 
 **Дата:** {{ note.date.strftime("%Y-%m-%d") }} | **Тег:** `{{ note.tag }}`{% if note.prev_tag %} | **Предыдущий:** `{{ note.prev_tag }}`{% endif %}
 
 {% if note.ai_summary %}
 <!-- @ai:section type="ai_summary" -->
-## Обзор изменений
+## 📖 Обзор изменений
 
 {{ note.ai_summary }}
 <!-- @ai:end -->
 {% endif %}
 
 <!-- @ai:section type="diff_stats" -->
-## Статистика изменений
+## 📊 Статистика изменений
 
 | Метрика | Значение |
 |---|---|
@@ -38,7 +38,7 @@
 
 {% if feats %}
 <!-- @ai:section type="new_features" -->
-## Новые возможности
+## ✨ Новые возможности
 
 {% for entry in feats %}
 - {{ entry.message }}{% if entry.scope %} (`{{ entry.scope }}`){% endif %} — `{{ entry.sha }}`
@@ -48,7 +48,7 @@
 
 {% if fixes %}
 <!-- @ai:section type="bug_fixes" -->
-## Исправления
+## 🐛 Исправления
 
 {% for entry in fixes %}
 - {{ entry.message }} — `{{ entry.sha }}`
@@ -58,7 +58,7 @@
 
 {% if others %}
 <!-- @ai:section type="other_changes" -->
-## Прочие изменения
+## 📦 Прочие изменения
 
 {% for entry in others %}
 - [{{ entry.kind }}] {{ entry.message }} — `{{ entry.sha }}`
@@ -68,7 +68,7 @@
 
 {% if note.changed_symbols %}
 <!-- @ai:section type="changed_symbols" -->
-## Изменённое публичное API
+## 🔄 Изменённое публичное API
 
 {% for sym in note.changed_symbols %}
 - `{{ sym }}`
