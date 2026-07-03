@@ -13,7 +13,7 @@ from servicedoc.docs.json_example import TypeRegistry
 from servicedoc.models.docs import DocOutput, ReleaseNote
 from servicedoc.models.pipeline import PipelineContext
 from servicedoc.models.proto import ProtoMessage, ProtoService
-from servicedoc.models.symbols import ClassSymbol, FunctionSymbol, Symbol, TypeRef
+from servicedoc.models.symbols import Symbol, TypeRef
 from servicedoc.utils.source_links import make_source_ref
 
 logger = logging.getLogger(__name__)
@@ -89,56 +89,24 @@ _STRUCTS_KINDS = ("class", "struct", "interface")
 _PROTO_MAP_TYPE_RE = re.compile(r"^map<\s*\w+\s*,\s*(\w+)\s*>$")
 
 
-def _all_type_ref_names(symbols: list[Symbol]) -> set[str]:
-    """Every type name referenced anywhere in the parsed code (params, return
-    types, struct fields) — used to figure out which proto messages this
-    service's Go code actually touches."""
-    names: set[str] = set()
-    for sym in symbols:
-        if isinstance(sym, FunctionSymbol):
-            for p in sym.parameters:
-                names.add(p.type_ref.name)
-            for r in sym.return_types:
-                names.add(r.name)
-        elif isinstance(sym, ClassSymbol):
-            for f in sym.fields:
-                names.add(f.type_ref.name)
-    return names
-
-
-def _go_rpc_signatures(symbols: list[Symbol]) -> set[tuple[str, str, str]]:
-    """(method name, input type name, output type name) for every Go method —
-    matching an RPC purely by method name is too loose (e.g. "Info" is a
-    common generic handler name unrelated to any specific gRPC service);
-    requiring the request/response type names to match too makes it precise."""
-    sigs: set[tuple[str, str, str]] = set()
-    for sym in symbols:
-        if not isinstance(sym, FunctionSymbol) or sym.kind != "method":
-            continue
-        input_name = next((p.type_ref.name for p in sym.parameters if p.type_ref.name != "Context"), None)
-        output_name = next((r.name for r in sym.return_types if r.name != "error"), None)
-        if input_name and output_name:
-            sigs.add((sym.name, input_name, output_name))
-    return sigs
-
-
-def _relevant_proto_objects(ctx: PipelineContext) -> tuple[list[ProtoService], list[ProtoMessage]]:
+def _relevant_proto_objects(ctx: PipelineContext, service_name: str) -> tuple[list[ProtoService], list[ProtoMessage]]:
     """A shared/vendored proto repo can hold contracts for many unrelated
-    services. Keep only what this service's Go code actually touches: a
-    service is relevant if one of its RPCs matches a Go method by name AND
-    request/response type; a message is relevant if it's referenced directly
-    by Go code, is an input/output of a relevant RPC, or is reachable from
-    either by walking nested message fields."""
+    services. Keep only proto files whose path contains the service's own
+    name (e.g. `--name dahubapi` matches `.../dahubapi/v1/extension_service.proto`
+    but not `.../api_gateway/api_gateway_service.proto`) — everything else is
+    someone else's service and gets ignored. Nested message types reachable
+    from a matched message (e.g. a shared `Pagination`) are still pulled in,
+    even if their own .proto file doesn't contain the name, since they're
+    part of the actual wire contract."""
     proto_by_name = {m.name: m for m in ctx.proto_messages}
-    used_type_names = _all_type_ref_names(ctx.symbols)
-    go_rpc_sigs = _go_rpc_signatures(ctx.symbols)
+    needle = service_name.lower()
 
-    relevant_services = [
-        svc for svc in ctx.proto_services
-        if any((m.name, m.input_type, m.output_type) in go_rpc_sigs for m in svc.methods)
-    ]
+    def _matches(file_path: Path | None) -> bool:
+        return file_path is not None and needle in str(file_path).lower()
 
-    seed_names = used_type_names & proto_by_name.keys()
+    relevant_services = [svc for svc in ctx.proto_services if _matches(svc.file_path)]
+
+    seed_names = {m.name for m in ctx.proto_messages if _matches(m.file_path)}
     for svc in relevant_services:
         for m in svc.methods:
             seed_names.add(m.input_type)
@@ -278,7 +246,7 @@ class MarkdownRenderer:
         return docs
 
     def _render_proto_api_md(self, ctx: PipelineContext, service_name: str, output_dir: Path) -> DocOutput:
-        relevant_services, relevant_messages = _relevant_proto_objects(ctx)
+        relevant_services, relevant_messages = _relevant_proto_objects(ctx, service_name)
         self._set_proto_source_ref_global(ctx)
         content = self._render(
             "API.md.j2",
