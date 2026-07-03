@@ -85,8 +85,10 @@ class AIClient:
             base_delay=self.config.retry_base_delay_seconds,
         )
 
-    async def describe_batch(self, symbols: list[Symbol], source_map: dict) -> list[str | None]:
-        """Send a batch of symbols for description. Returns list of descriptions."""
+    async def describe_batch(
+        self, symbols: list[Symbol], source_map: dict, extra_system: str | None = None,
+    ) -> list[str | None]:
+        """Send a batch of Go symbols for description. Returns list of descriptions."""
         items = []
         for sym in symbols:
             code = source_map.get(sym.file_path, b"")
@@ -104,20 +106,32 @@ class AIClient:
                 "line_end": sym.line_end,
                 "code_block": code_block,
             })
+        return await self.describe_items_raw(items, extra_system=extra_system)
+
+    async def describe_items_raw(
+        self, items: list[dict], extra_system: str | None = None,
+    ) -> list[str | None]:
+        """Same batch-describe machinery as `describe_batch`, for callers that
+        aren't `Symbol` objects (e.g. proto messages/services/RPC methods) —
+        `items` must already be dicts with name/kind/file_path/line_start/
+        line_end/code_block keys matching BATCH_DESCRIBE_USER's template."""
+        system = BATCH_DESCRIBE_SYSTEM
+        if extra_system:
+            system = f"{system}\n\n{extra_system}"
 
         user_prompt = Template(BATCH_DESCRIBE_USER).render(symbols=items, count=len(items))
         try:
-            response = await self.complete(BATCH_DESCRIBE_SYSTEM, user_prompt)
+            response = await self.complete(system, user_prompt)
             if not isinstance(response, str):
                 logger.warning("AI batch describe returned empty content (no message.content in response)")
-                return [None] * len(symbols)
+                return [None] * len(items)
             # parse JSON array from response
             start = response.find("[")
             end = response.rfind("]") + 1
             if start >= 0 and end > start:
                 descriptions = json.loads(response[start:end])
-                if isinstance(descriptions, list) and len(descriptions) == len(symbols):
+                if isinstance(descriptions, list) and len(descriptions) == len(items):
                     return descriptions
         except Exception as exc:
             logger.warning("AI batch describe failed: %s", exc)
-        return [None] * len(symbols)
+        return [None] * len(items)

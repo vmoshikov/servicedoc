@@ -34,6 +34,10 @@ class PipelineRunner:
             work_dir=work_dir,
             output_dir=output_dir,
         )
+        try:
+            ctx.glossary_text = self.config.glossary_path.read_text(encoding="utf-8").strip() or None
+        except OSError:
+            ctx.glossary_text = None
 
         for stage in self.stages:
             if stage.name in self.config.skip_stages:

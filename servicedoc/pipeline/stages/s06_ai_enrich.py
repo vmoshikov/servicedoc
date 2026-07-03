@@ -3,6 +3,7 @@ import logging
 from typing import ClassVar
 
 from servicedoc.ai.client import AIClient
+from servicedoc.ai.glossary import glossary_system_block
 from servicedoc.docs.regenerate_markers import scan_regenerate_markers
 from servicedoc.models.pipeline import PipelineContext, StageResult
 from servicedoc.pipeline.base import Stage
@@ -72,6 +73,8 @@ class AIEnrichmentStage(Stage):
         if not truly_needs_ai:
             return StageResult(stage_name=self.name, success=True)
 
+        extra_system = glossary_system_block(ctx.glossary_text)
+
         fresh_symbols = [sym for sym, _ in truly_needs_ai]
         fresh_keys = [key for _, key in truly_needs_ai]
         batches = list(zip(_chunk(fresh_symbols, self.batch_size), _chunk(fresh_keys, self.batch_size)))
@@ -81,7 +84,7 @@ class AIEnrichmentStage(Stage):
         async def process_batch(sym_batch: list, key_batch: list) -> None:
             nonlocal enriched
             async with self.semaphore:
-                descriptions = await self.client.describe_batch(sym_batch, source_map)
+                descriptions = await self.client.describe_batch(sym_batch, source_map, extra_system=extra_system)
                 for sym, key, desc in zip(sym_batch, key_batch, descriptions):
                     if desc:
                         sym.ai_description = desc

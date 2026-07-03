@@ -17,6 +17,13 @@ class ProtoMessage(BaseModel):
     file_path: Path | None = None
     line_start: int | None = None
     line_end: int | None = None
+    comment: str | None = None
+    ai_description: str | None = None
+    needs_ai: bool = False
+
+    @property
+    def description(self) -> str | None:
+        return self.comment or self.ai_description
 
     def to_json_schema(self) -> dict:
         return {
@@ -32,6 +39,13 @@ class ProtoMethod(BaseModel):
     client_streaming: bool = False
     server_streaming: bool = False
     line: int | None = None
+    comment: str | None = None
+    ai_description: str | None = None
+    needs_ai: bool = False
+
+    @property
+    def description(self) -> str | None:
+        return self.comment or self.ai_description
 
 
 class ProtoService(BaseModel):
@@ -40,3 +54,10 @@ class ProtoService(BaseModel):
     file_path: Path
     line_start: int | None = None
     line_end: int | None = None
+    comment: str | None = None
+    ai_description: str | None = None
+    needs_ai: bool = False
+
+    @property
+    def description(self) -> str | None:
+        return self.comment or self.ai_description

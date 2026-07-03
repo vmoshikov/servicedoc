@@ -7,37 +7,69 @@
 <!-- @ai:section type="toc" -->
 ## Содержание
 
-{% if proto_services %}
+{% for group, content in proto_groups.items() %}
+### {{ group }}
+
+{% if content.services %}
 **gRPC сервисы**
-{% for svc in proto_services %}
-- [`{{ svc.name }}`](#{{ make_anchor(svc.name) }})
+{% for svc in content.services %}
+- [`{{ svc.name }}`](#{{ make_anchor(group + "-" + svc.name) }})
 {% for method in svc.methods %}
-  - [`{{ method.name }}`](#{{ make_anchor(svc.name + "-" + method.name) }})
+  - [`{{ method.name }}`](#{{ make_anchor(group + "-" + svc.name + "-" + method.name) }})
 {% endfor %}
 {% endfor %}
 
 {% endif %}
-{% if proto_messages %}
+{% if content.messages %}
 **Сообщения**
-{% for msg in proto_messages %}
-- [`{{ msg.name }}`](#{{ make_anchor(msg.name) }})
+{% for msg in content.messages %}
+- [`{{ msg.name }}`](#{{ make_anchor(group + "-" + msg.name) }})
 {% endfor %}
 {% endif %}
+
+{% endfor %}
 <!-- @ai:end -->
 
 ---
 
-{% for svc in proto_services %}
-<!-- @ai:section type="grpc_service" id="{{ svc.name }}" -->
-## {{ svc.name }}
+{% for group, content in proto_groups.items() %}
+## {{ group }}
+
+{% for svc in content.services %}
+<!-- @ai:section type="grpc_service" id="{{ group }}-{{ svc.name }}" -->
+### {{ svc.name }}
+
+<!-- @ai:field name="description" -->
+{% if svc.comment %}
+{{ svc.comment }}
+{% elif svc.ai_description %}
+{{ svc.ai_description }}
+
+> ⚠️ *Источник: AI-анализ (комментарий разработчика отсутствует)*
+{% else %}
+> Описание недоступно.
+{% endif %}
+<!-- @ai:end -->
 
 <!-- @ai:field name="source" -->
 **Файл:** {{ proto_source_ref(svc.file_path, svc.line_start, svc.line_end) }}
 <!-- @ai:end -->
 
 {% for method in svc.methods %}
-<!-- @ai:section type="rpc_method" id="{{ svc.name }}-{{ method.name }}" -->
-### {{ method.name }}
+<!-- @ai:section type="rpc_method" id="{{ group }}-{{ svc.name }}-{{ method.name }}" -->
+#### {{ method.name }}
+
+<!-- @ai:field name="description" -->
+{% if method.comment %}
+{{ method.comment }}
+{% elif method.ai_description %}
+{{ method.ai_description }}
+
+> ⚠️ *Источник: AI-анализ (комментарий разработчика отсутствует)*
+{% else %}
+> Описание недоступно.
+{% endif %}
+<!-- @ai:end -->
 
 <!-- @ai:field name="signature" -->
 ```
@@ -59,9 +91,21 @@ rpc {{ method.name }}({% if method.client_streaming %}stream {% endif %}{{ metho
 ---
 
 {% endfor %}
-{% for msg in proto_messages %}
-<!-- @ai:section type="proto_message" id="{{ msg.name }}" -->
-## {{ msg.name }}
+{% for msg in content.messages %}
+<!-- @ai:section type="proto_message" id="{{ group }}-{{ msg.name }}" -->
+### {{ msg.name }}
+
+<!-- @ai:field name="description" -->
+{% if msg.comment %}
+{{ msg.comment }}
+{% elif msg.ai_description %}
+{{ msg.ai_description }}
+
+> ⚠️ *Источник: AI-анализ (комментарий разработчика отсутствует)*
+{% else %}
+> Описание недоступно.
+{% endif %}
+<!-- @ai:end -->
 
 {% if msg.fields %}
 <!-- @ai:field name="fields" format="table" -->
@@ -92,5 +136,6 @@ rpc {{ method.name }}({% if method.client_streaming %}stream {% endif %}{{ metho
 
 ---
 
+{% endfor %}
 {% endfor %}
 <!-- @ai:end -->

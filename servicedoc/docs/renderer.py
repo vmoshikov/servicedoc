@@ -133,6 +133,37 @@ def _relevant_proto_objects(ctx: PipelineContext, service_name: str) -> tuple[li
     return relevant_services, relevant_messages
 
 
+_PROTO_VISIBILITY_ORDER = ["public", "private"]
+_PROTO_VISIBILITY_OTHER = "other"
+
+
+def _proto_visibility(file_path: Path | None) -> str:
+    """`proto/public/...` vs `proto/private/...` — same service name can
+    exist in both trees (public-facing contract vs internal one), so group
+    separately instead of colliding them under one flat list."""
+    if file_path is None:
+        return _PROTO_VISIBILITY_OTHER
+    parts = set(Path(file_path).parts)
+    for v in _PROTO_VISIBILITY_ORDER:
+        if v in parts:
+            return v
+    return _PROTO_VISIBILITY_OTHER
+
+
+def _group_proto_by_visibility(
+    services: list[ProtoService], messages: list[ProtoMessage],
+) -> dict[str, dict[str, list]]:
+    groups: dict[str, dict[str, list]] = {
+        v: {"services": [], "messages": []}
+        for v in [*_PROTO_VISIBILITY_ORDER, _PROTO_VISIBILITY_OTHER]
+    }
+    for svc in services:
+        groups[_proto_visibility(svc.file_path)]["services"].append(svc)
+    for msg in messages:
+        groups[_proto_visibility(msg.file_path)]["messages"].append(msg)
+    return {k: v for k, v in groups.items() if v["services"] or v["messages"]}
+
+
 class MarkdownRenderer:
     def __init__(self) -> None:
         self.env = Environment(
@@ -247,12 +278,12 @@ class MarkdownRenderer:
 
     def _render_proto_api_md(self, ctx: PipelineContext, service_name: str, output_dir: Path) -> DocOutput:
         relevant_services, relevant_messages = _relevant_proto_objects(ctx, service_name)
+        proto_groups = _group_proto_by_visibility(relevant_services, relevant_messages)
         self._set_proto_source_ref_global(ctx)
         content = self._render(
             "API.md.j2",
             service_name=service_name,
-            proto_services=relevant_services,
-            proto_messages=relevant_messages,
+            proto_groups=proto_groups,
             make_anchor=_make_anchor,
         )
         return DocOutput(path=output_dir / "API.md", content=content, doc_type="api")

@@ -60,6 +60,12 @@ class PipelineContext(BaseModel):
     proto_repo_path: Path | None = None
     proto_repo_branch: str = "main"
     proto_repo_base_url: str = ""
+    # GLOSSARY.md lives in the servicedoc tool itself (ServiceDocConfig.glossary_path,
+    # loaded by PipelineRunner) — shared terminology across every analyzed repo.
+    glossary_text: str | None = None
+    # FOR_AI.md lives in the analyzed project's own repo (loaded by s01_ingest) —
+    # extra project-specific context for the README overview prompt.
+    for_ai_text: str | None = None
 
     @property
     def public_symbols(self) -> list[Symbol]:

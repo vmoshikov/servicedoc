@@ -19,6 +19,13 @@ def _normalize_repo_url(url: str) -> str:
     return clean_url.rstrip("/").removesuffix(".git")
 
 
+def _read_optional_text(path) -> str | None:
+    try:
+        return path.read_text(encoding="utf-8").strip() or None
+    except OSError:
+        return None
+
+
 class RepoIngestionStage(Stage):
     name: ClassVar[str] = "s01_ingest"
     required: ClassVar[bool] = True
@@ -41,6 +48,10 @@ class RepoIngestionStage(Stage):
             branch=ctx.repo_config.branch,
         )
         ctx.local_repo_path = repo_dir
+        # FOR_AI.md lives in the analyzed project's own repo (contrast with
+        # GLOSSARY.md, which lives in the servicedoc tool itself — see
+        # ServiceDocConfig.glossary_path / PipelineRunner.run()).
+        ctx.for_ai_text = _read_optional_text(repo_dir / "FOR_AI.md")
 
         # detect actual checked-out branch
         try:

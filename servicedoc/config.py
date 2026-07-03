@@ -46,3 +46,9 @@ class ServiceDocConfig(BaseSettings):
     max_concurrent_ai_calls: int = 3
     skip_stages: list[str] = []
     report_language: str = "ru"
+    # lives in the servicedoc tool itself (not the analyzed project) — internal
+    # terminology shared across every repo this tool documents. Contrast with
+    # FOR_AI.md, which lives in the analyzed project's own repo.
+    glossary_path: Path = Field(
+        default_factory=lambda: Path(__file__).resolve().parent.parent / "GLOSSARY.md"
+    )

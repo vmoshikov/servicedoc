@@ -25,17 +25,34 @@ class ProtoFileParser:
         messages: list[ProtoMessage] = []
         stack: list[dict] = []
         depth = 0
+        # comment lines immediately above a message/service/rpc definition
+        # become its doc comment; any other line (field, blank, close-brace)
+        # breaks the association.
+        pending_comment: list[str] = []
 
         for lineno, line in enumerate(lines, start=1):
             if _COMMENT.match(line):
+                pending_comment.append(line.strip()[2:].strip())
                 continue
             depth += line.count("{") - line.count("}")
 
             if m := _MSG_OPEN.match(line):
-                stack.append({"kind": "message", "name": m.group(1), "depth": depth, "fields": [], "line_start": lineno})
+                comment = "\n".join(pending_comment) if pending_comment else None
+                pending_comment = []
+                stack.append({
+                    "kind": "message", "name": m.group(1), "depth": depth, "fields": [],
+                    "line_start": lineno, "comment": comment,
+                })
             elif m := _SVC_OPEN.match(line):
-                stack.append({"kind": "service", "name": m.group(1), "depth": depth, "methods": [], "line_start": lineno})
+                comment = "\n".join(pending_comment) if pending_comment else None
+                pending_comment = []
+                stack.append({
+                    "kind": "service", "name": m.group(1), "depth": depth, "methods": [],
+                    "line_start": lineno, "comment": comment,
+                })
             elif (m := _RPC.match(line)) and stack and stack[-1]["kind"] == "service":
+                comment = "\n".join(pending_comment) if pending_comment else None
+                pending_comment = []
                 stack[-1]["methods"].append(ProtoMethod(
                     name=m.group(1),
                     input_type=m.group(3),
@@ -43,8 +60,11 @@ class ProtoFileParser:
                     client_streaming=bool(m.group(2)),
                     server_streaming=bool(m.group(4)),
                     line=lineno,
+                    comment=comment,
+                    needs_ai=comment is None,
                 ))
             elif (m := _MAP_FIELD.match(line)) and stack and stack[-1]["kind"] == "message":
+                pending_comment = []
                 stack[-1]["fields"].append(ProtoField(
                     name=m.group(3),
                     type=f"map<{m.group(1)},{m.group(2)}>",
@@ -52,6 +72,7 @@ class ProtoFileParser:
                     label="optional",
                 ))
             elif (m := _FIELD.match(line)) and stack and stack[-1]["kind"] == "message":
+                pending_comment = []
                 label_raw = (m.group(1) or "").strip()
                 label = "repeated" if label_raw == "repeated" else (
                     "required" if label_raw == "required" else "optional"
@@ -63,11 +84,13 @@ class ProtoFileParser:
                     label=label,
                 ))
             elif _CLOSE.match(line) and stack and depth < stack[-1]["depth"]:
+                pending_comment = []
                 frame = stack.pop()
                 if frame["kind"] == "message":
                     messages.append(ProtoMessage(
                         name=frame["name"], fields=frame["fields"], file_path=path,
                         line_start=frame["line_start"], line_end=lineno,
+                        comment=frame["comment"], needs_ai=frame["comment"] is None,
                     ))
                 elif frame["kind"] == "service":
                     services.append(ProtoService(
@@ -76,6 +99,10 @@ class ProtoFileParser:
                         file_path=path,
                         line_start=frame["line_start"],
                         line_end=lineno,
+                        comment=frame["comment"],
+                        needs_ai=frame["comment"] is None,
                     ))
+            else:
+                pending_comment = []
 
         return services, messages
