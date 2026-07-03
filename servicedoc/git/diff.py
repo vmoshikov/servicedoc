@@ -1,7 +1,37 @@
 import asyncio
+import re
 from pathlib import Path
 
 import git
+
+_HUNK_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
+
+
+def touched_line_ranges(patch_text: str) -> list[tuple[int, int]]:
+    """Line numbers (1-indexed, on the "new" side of the diff) actually
+    added/changed by a patch — walks each hunk body tracking the running
+    new-file line number, only marking `+` lines as touched. The hunk
+    header's declared range (`@@ -a,b +c,d @@`) includes surrounding
+    context lines (3 by default) and would over-match — e.g. a 1-line
+    change in a short file can make the hunk "cover" the whole file."""
+    ranges: list[tuple[int, int]] = []
+    new_line: int | None = None
+    for line in patch_text.splitlines():
+        if m := _HUNK_RE.match(line):
+            new_line = int(m.group(1))
+            continue
+        if new_line is None:
+            continue
+        if line.startswith("+") and not line.startswith("+++"):
+            ranges.append((new_line, new_line))
+            new_line += 1
+        elif line.startswith("-") and not line.startswith("---"):
+            pass  # removed line — doesn't exist in the new file
+        elif line.startswith("\\"):
+            pass  # "\ No newline at end of file" — not a content line
+        else:
+            new_line += 1  # unchanged context line
+    return ranges
 
 
 class DiffExtractor:

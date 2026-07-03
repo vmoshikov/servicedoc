@@ -22,7 +22,7 @@ from servicedoc.docs.renderer import (
     _service_name,
     MarkdownRenderer,
 )
-from servicedoc.git.diff import DiffExtractor
+from servicedoc.git.diff import DiffExtractor, touched_line_ranges
 from servicedoc.git.history import CommitHistory
 from servicedoc.models.docs import ReleaseNote
 from servicedoc.models.pipeline import PipelineContext, StageResult
@@ -87,10 +87,21 @@ class DocumentationStage(Stage):
                 tag_entries = [e for e in ctx.git_history if e.tag == tag]
                 stats = await diff_extractor.stats(prev_tag, tag)
                 diff_map = await diff_extractor.get_diff(prev_tag, tag)
-                changed_symbol_names = [
-                    s.name for s in ctx.public_symbols
-                    if str(s.file_path.relative_to(ctx.local_repo_path)) in diff_map
-                ]
+                # match by touched line ranges, not just "file appears in the
+                # diff" — otherwise every public symbol in a file counts as
+                # "changed" even if only one unrelated function in it moved.
+                changed_symbol_names = []
+                for s in ctx.public_symbols:
+                    try:
+                        rel = str(s.file_path.relative_to(ctx.local_repo_path))
+                    except ValueError:
+                        continue
+                    patch_text = diff_map.get(rel)
+                    if not patch_text:
+                        continue
+                    ranges = touched_line_ranges(patch_text)
+                    if any(s.line_start <= r_end and s.line_end >= r_start for r_start, r_end in ranges):
+                        changed_symbol_names.append(s.name)
 
                 try:
                     import git
@@ -132,8 +143,11 @@ class DocumentationStage(Stage):
 
         await self._enrich_proto_descriptions(ctx, service_name, extra_system)
         overview = await self._build_overview(ctx, tags, service_name, extra_system)
+        contributors = await history.author_commit_counts()
 
-        docs = await self.renderer.render_all(ctx, release_notes=release_notes, overview=overview)
+        docs = await self.renderer.render_all(
+            ctx, release_notes=release_notes, overview=overview, contributors=contributors,
+        )
         logger.info("Generated %d documentation files", len(docs))
         return StageResult(stage_name=self.name, success=True)
 

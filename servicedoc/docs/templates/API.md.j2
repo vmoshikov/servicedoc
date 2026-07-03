@@ -5,21 +5,27 @@
 Остальной код сервиса — см. [FUNCTIONS.md](./FUNCTIONS.md) и [STRUCTURES.md](./STRUCTURES.md).
 
 {% set group_emoji = {"public": "🌐", "private": "🔒"} %}
+{% set group_label = {"public": "Публичный", "private": "Приватный"} %}
 <!-- @ai:section type="toc" -->
 ## 🧭 Содержание
 
 {% for group, content in proto_groups.items() %}
-### {{ group_emoji.get(group, "📁") }} {{ group }}
+### {{ group_emoji.get(group, "📁") }} {{ group_label.get(group, group) }} («{{ group }}»)
 
 {% if content.services %}
 **📡 gRPC сервисы**
 {% for svc in content.services %}
 - [`{{ svc.name }}`](#{{ make_anchor(group + "-" + svc.name) }})
+
+<details><summary>RPC методы ({{ svc.methods | length }})</summary>
+
 {% for method in svc.methods %}
-  - [`{{ method.name }}`](#{{ make_anchor(group + "-" + svc.name + "-" + method.name) }})
-{% endfor %}
+  - `{{ method.name }}`
 {% endfor %}
 
+</details>
+
+{% endfor %}
 {% endif %}
 {% if content.messages %}
 **📨 Сообщения**
@@ -34,7 +40,7 @@
 ---
 
 {% for group, content in proto_groups.items() %}
-## {{ group_emoji.get(group, "📁") }} {{ group }}
+## {{ group_emoji.get(group, "📁") }} {{ group_label.get(group, group) }} («{{ group }}»)
 
 {% for svc in content.services %}
 <!-- @ai:section type="grpc_service" id="{{ group }}-{{ svc.name }}" -->

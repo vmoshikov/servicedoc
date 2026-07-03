@@ -295,6 +295,7 @@ class MarkdownRenderer:
         ctx: PipelineContext,
         release_notes: list[ReleaseNote] | None = None,
         overview: str | None = None,
+        contributors: list[tuple[str, int]] | None = None,
     ) -> list[DocOutput]:
         output_dir = ctx.output_dir
         service_name = _service_name(ctx)
@@ -321,6 +322,9 @@ class MarkdownRenderer:
                 has_er=bool(ctx.er_entities),
                 has_release_notes=bool(release_notes),
                 overview=overview,
+                contributors=contributors or [],
+                provider_names=ctx.provider_names,
+                test_match_report=ctx.test_match_report,
             ),
             doc_type="readme",
         ))

@@ -17,6 +17,16 @@ T = TypeVar("T")
 _ALWAYS_PRIVATE_DIR_NAMES = frozenset({"priv"})
 _NESTED_ONLY_PRIVATE_DIR_NAMES = frozenset({"internal"})
 _TEST_DIR_NAMES = frozenset({"test", "tests"})
+_MOCK_DIR_NAMES = frozenset({"mock", "mocks"})
+_PROVIDER_DIR_NAME = "provider"
+
+
+def _rel_dir_parts(file_path: Path, root: Path | None) -> tuple[str, ...]:
+    """Directory segments of file_path relative to root (excludes the filename)."""
+    try:
+        return file_path.relative_to(root).parts[:-1] if root else file_path.parts[:-1]
+    except ValueError:
+        return file_path.parts[:-1]
 
 
 def _is_test_symbol(s: Symbol, root: Path | None) -> bool:
@@ -29,11 +39,45 @@ def _is_test_symbol(s: Symbol, root: Path | None) -> bool:
         return True
     if s.name.startswith("Test"):
         return True
-    try:
-        rel_parts = s.file_path.relative_to(root).parts[:-1] if root else s.file_path.parts[:-1]
-    except ValueError:
-        rel_parts = s.file_path.parts[:-1]
+    rel_parts = _rel_dir_parts(s.file_path, root)
     return any(part.lower() in _TEST_DIR_NAMES for part in rel_parts)
+
+
+def _is_mock_symbol(s: Symbol, root: Path | None) -> bool:
+    """Generated/hand-written mocks (mockery, gomock, ...) — service-internal
+    scaffolding, not part of the documented surface."""
+    name = s.file_path.name.lower()
+    if name.startswith("mock_") or name.endswith("_mock.go") or name.endswith("_mock.py"):
+        return True
+    rel_parts = _rel_dir_parts(s.file_path, root)
+    return any(part.lower() in _MOCK_DIR_NAMES for part in rel_parts)
+
+
+def _is_provider_symbol(s: Symbol, root: Path | None) -> bool:
+    """provider/ wraps third-party/standard libraries (db drivers, caches,
+    ...) — not worth documenting function-by-function; see provider_names
+    for the top-level summary instead."""
+    rel_parts = _rel_dir_parts(s.file_path, root)
+    return any(part.lower() == _PROVIDER_DIR_NAME for part in rel_parts)
+
+
+def _provider_names(file_paths: list[Path], root: Path | None) -> list[str]:
+    """Unique provider identifiers, e.g. `provider/db/postgres/...` and
+    `provider/db/redis/...` → ["db/postgres", "db/redis"]."""
+    names: set[str] = set()
+    for path in file_paths:
+        try:
+            parts = path.relative_to(root).parts if root else path.parts
+        except ValueError:
+            parts = path.parts
+        parts_lower = [p.lower() for p in parts]
+        if _PROVIDER_DIR_NAME not in parts_lower:
+            continue
+        idx = parts_lower.index(_PROVIDER_DIR_NAME)
+        after = parts[idx + 1:-1]  # dirs after provider/, excluding the filename
+        if after:
+            names.add("/".join(after))
+    return sorted(names)
 
 
 class StageResult(BaseModel, Generic[T]):
@@ -96,13 +140,10 @@ class PipelineContext(BaseModel):
         for s in self.symbols:
             if not s.is_public:
                 continue
-            if _is_test_symbol(s, root):
+            if _is_test_symbol(s, root) or _is_mock_symbol(s, root) or _is_provider_symbol(s, root):
                 continue
             if root is not None:
-                try:
-                    rel_parts = s.file_path.relative_to(root).parts[:-1]
-                except ValueError:
-                    rel_parts = s.file_path.parts[:-1]
+                rel_parts = _rel_dir_parts(s.file_path, root)
                 # "internal" only excludes nested occurrences (e.g. pkg/internal/),
                 # not a repo-root-level internal/ — that's where Go convention
                 # puts all application code, not "hide from docs".
@@ -120,3 +161,10 @@ class PipelineContext(BaseModel):
         coverage matching."""
         root = self.local_repo_path
         return [s for s in self.symbols if s.is_public and _is_test_symbol(s, root)]
+
+    @property
+    def provider_names(self) -> list[str]:
+        """Unique provider identifiers (e.g. "db/postgres", "db/redis") from
+        all source files under any provider/ directory — individual
+        functions/structs in there aren't documented (third-party wrappers)."""
+        return _provider_names(self.all_source_files, self.local_repo_path)

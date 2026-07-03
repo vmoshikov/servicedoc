@@ -48,6 +48,46 @@
 <!-- @ai:end -->
 {% endif %}
 
+{% if provider_names %}
+## 🔌 Провайдеры
+
+<!-- @ai:section type="providers" -->
+Обёртки над сторонними/стандартными библиотеками — не документируются функция за функцией:
+
+{% for name in provider_names %}
+- `{{ name }}`
+{% endfor %}
+<!-- @ai:end -->
+{% endif %}
+
+{% if test_match_report %}
+## 🧪 Сводка по тестам
+
+<!-- @ai:section type="test_summary" -->
+| Метрика | Значение |
+|---|---|
+| Функций с именным тестом | {{ test_match_report.covered_function_count }} / {{ test_match_report.total_function_count }} (**{{ test_match_report.coverage_pct }}%**) |
+| Тестовых файлов | {{ test_file_count }} |
+{% if coverage_pct is not none %}
+| Покрытие строк кода | {{ coverage_pct }}% |
+{% endif %}
+
+Подробности — в [TESTS.md](./TESTS.md).
+<!-- @ai:end -->
+{% endif %}
+
+{% if contributors %}
+## 👥 Разработчики
+
+<!-- @ai:section type="contributors" -->
+| Автор | Коммитов |
+|---|---|
+{% for name, count in contributors %}
+| {{ name }} | {{ count }} |
+{% endfor %}
+<!-- @ai:end -->
+{% endif %}
+
 {% if has_er %}
 ## 🗄️ Архитектура базы данных
 

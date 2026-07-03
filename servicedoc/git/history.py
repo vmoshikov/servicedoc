@@ -85,3 +85,15 @@ class CommitHistory:
             commits = list(self.repo.iter_commits(rev))
             return [_parse_commit(c, tag=to_ref) for c in commits]
         return await asyncio.to_thread(_get)
+
+    async def author_commit_counts(self) -> list[tuple[str, int]]:
+        """Commit count per author across the full history, sorted descending.
+        Author names are raw git identities — map them to real names via
+        GLOSSARY.md if needed."""
+        def _get() -> list[tuple[str, int]]:
+            counts: dict[str, int] = {}
+            for commit in self.repo.iter_commits():
+                name = str(commit.author)
+                counts[name] = counts.get(name, 0) + 1
+            return sorted(counts.items(), key=lambda kv: kv[1], reverse=True)
+        return await asyncio.to_thread(_get)
