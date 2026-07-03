@@ -18,13 +18,14 @@ class Parameter(BaseModel):
     name: str
     type_ref: TypeRef
     json_name: str | None = None  # from a `json:"..."` struct tag, if present
+    comment: str | None = None  # leading `//` comment above a struct field
 
 
 class Symbol(BaseModel):
     model_config = ConfigDict(frozen=False)
 
     name: str
-    kind: Literal["function", "method", "class", "interface", "struct", "type_alias"]
+    kind: Literal["function", "method", "class", "interface", "struct", "type_alias", "const"]
     file_path: Path
     line_start: int
     line_end: int
@@ -38,17 +39,39 @@ class Symbol(BaseModel):
         return self.comment or self.ai_description
 
 
+class SwitchCase(BaseModel):
+    value: str
+    message: str
+
+
+class SwitchStringMap(BaseModel):
+    """A `switch param { case "x": return "msg" ... }` body that maps a
+    string input to a fixed set of human-readable output strings — e.g. an
+    operation-type-to-title lookup. Only recorded when every case (and the
+    default, if present) is a single `return <string literal>`."""
+    param_name: str
+    cases: list[SwitchCase] = []
+    default_message: str | None = None
+
+
 class FunctionSymbol(Symbol):
-    kind: Literal["function", "method", "class", "interface", "struct", "type_alias"] = "function"
+    kind: Literal["function", "method", "class", "interface", "struct", "type_alias", "const"] = "function"
     parameters: list[Parameter] = []
     return_types: list[TypeRef] = []
     receiver: str | None = None
+    message_map: SwitchStringMap | None = None
 
 
 class ClassSymbol(Symbol):
-    kind: Literal["function", "method", "class", "interface", "struct", "type_alias"] = "class"
+    kind: Literal["function", "method", "class", "interface", "struct", "type_alias", "const"] = "class"
     methods: list[FunctionSymbol] = []
     fields: list[Parameter] = []
     base_classes: list[str] = []
     decorators: list[str] = []
     type_params: str | None = None  # raw generic parameter list, e.g. "[T comparable]"
+
+
+class ConstSymbol(Symbol):
+    kind: Literal["function", "method", "class", "interface", "struct", "type_alias", "const"] = "const"
+    value: str = ""  # raw source text of the constant's expression
+    type_name: str | None = None  # explicit type, if declared (e.g. "OpType" in `OpCreate OpType = "..."`)

@@ -14,14 +14,12 @@
 
 {% if content.services %}
 **📡 gRPC сервисы**
+
 {% for svc in content.services %}
-- [`{{ svc.name }}`](#{{ make_anchor(group + "-" + svc.name) }})
+**[`{{ svc.name }}`](#{{ make_anchor(group + "-" + svc.name) }})**
+<details><summary>{{ svc.methods | length }} методов</summary>
 
-<details><summary>RPC методы ({{ svc.methods | length }})</summary>
-
-{% for method in svc.methods %}
-  - `{{ method.name }}`
-{% endfor %}
+{% for method in svc.methods %}`{{ method.name }}`{% if not loop.last %}, {% endif %}{% endfor %}
 
 </details>
 

@@ -51,6 +51,9 @@
 ```go
 type {{ cls.name }}{{ cls.type_params or "" }} struct {
 {% for f in cls.fields %}
+{% if f.comment %}
+	// {{ f.comment }}
+{% endif %}
 	{{ f.name }} {% if f.type_ref.is_pointer %}*{% endif %}{% if f.type_ref.package %}{{ f.type_ref.package }}.{% endif %}{{ f.type_ref.name }}
 {% endfor %}
 }

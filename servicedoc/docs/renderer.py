@@ -10,6 +10,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from servicedoc.docs.changelog import deduplicate, group_entries
 from servicedoc.docs.json_example import TypeRegistry
+from servicedoc.er.svg import DEFAULT_PLANTUML_SERVER, render_svg
 from servicedoc.models.docs import DocOutput, ReleaseNote
 from servicedoc.models.pipeline import PipelineContext
 from servicedoc.models.proto import ProtoMessage, ProtoService
@@ -87,19 +88,29 @@ _FUNCS_KINDS = ("function", "method")
 _STRUCTS_KINDS = ("class", "struct", "interface")
 
 _PROTO_MAP_TYPE_RE = re.compile(r"^map<\s*\w+\s*,\s*(\w+)\s*>$")
+_PLANTUML_ENTITY_RE = re.compile(r'^\s*entity\s+"?(\w+)"?', re.MULTILINE)
+
+
+def _table_names_from_diagram(diagram: str) -> list[str]:
+    """Table/entity names declared in a PlantUML ER diagram — used as the
+    "tables used by this service" list when entities come from the AI/
+    migrations path (which doesn't populate structured EREntity objects)."""
+    return sorted(set(_PLANTUML_ENTITY_RE.findall(diagram)))
 
 
 def _relevant_proto_objects(ctx: PipelineContext, service_name: str) -> tuple[list[ProtoService], list[ProtoMessage]]:
     """A shared/vendored proto repo can hold contracts for many unrelated
-    services. Keep only proto files whose path contains the service's own
-    name (e.g. `--name dahubapi` matches `.../dahubapi/v1/extension_service.proto`
+    services. Keep only proto files whose path contains this service's proto
+    name (e.g. `--proto-name dahubapi` matches `.../dahubapi/v1/extension_service.proto`
     but not `.../api_gateway/api_gateway_service.proto`) — everything else is
-    someone else's service and gets ignored. Nested message types reachable
-    from a matched message (e.g. a shared `Pagination`) are still pulled in,
-    even if their own .proto file doesn't contain the name, since they're
-    part of the actual wire contract."""
+    someone else's service and gets ignored. `--proto-name` defaults to
+    `--name`/`service_name` when the proto-repo directory naming happens to
+    agree with the display name (the common case). Nested message types
+    reachable from a matched message (e.g. a shared `Pagination`) are still
+    pulled in, even if their own .proto file doesn't contain the name, since
+    they're part of the actual wire contract."""
     proto_by_name = {m.name: m for m in ctx.proto_messages}
-    needle = service_name.lower()
+    needle = (ctx.repo_config.proto_name or service_name).lower()
 
     def _matches(file_path: Path | None) -> bool:
         return file_path is not None and needle in str(file_path).lower()
@@ -165,7 +176,8 @@ def _group_proto_by_visibility(
 
 
 class MarkdownRenderer:
-    def __init__(self) -> None:
+    def __init__(self, plantuml_server_url: str = DEFAULT_PLANTUML_SERVER) -> None:
+        self.plantuml_server_url = plantuml_server_url
         self.env = Environment(
             loader=FileSystemLoader(str(TEMPLATES_DIR)),
             autoescape=select_autoescape([]),
@@ -296,6 +308,8 @@ class MarkdownRenderer:
         release_notes: list[ReleaseNote] | None = None,
         overview: str | None = None,
         contributors: list[tuple[str, str, int]] | None = None,
+        er_description: str | None = None,
+        provider_overview: str | None = None,
     ) -> list[DocOutput]:
         output_dir = ctx.output_dir
         service_name = _service_name(ctx)
@@ -320,10 +334,12 @@ class MarkdownRenderer:
                 has_proto=bool(ctx.proto_services),
                 has_tests=bool(ctx.coverage_result),
                 has_er=bool(ctx.er_diagram),
+                has_messages=bool(ctx.message_map_symbols or ctx.const_symbols),
                 has_release_notes=bool(release_notes),
                 overview=overview,
                 contributors=contributors or [],
                 provider_names=ctx.provider_names,
+                provider_overview=provider_overview,
                 test_match_report=ctx.test_match_report,
             ),
             doc_type="readme",
@@ -354,6 +370,25 @@ class MarkdownRenderer:
             title_emoji="🧱",
         ))
 
+        # MESSAGES.md — string switch/case lookup functions + all top-level constants
+        message_map_symbols = ctx.message_map_symbols
+        const_symbols = ctx.const_symbols
+        if message_map_symbols or const_symbols:
+            repo_root = ctx.local_repo_path or Path("/")
+            docs.append(DocOutput(
+                path=output_dir / "MESSAGES.md",
+                content=self._render(
+                    "MESSAGES.md.j2",
+                    service_name=service_name,
+                    symbols=sorted(message_map_symbols, key=lambda s: s.name.lower()),
+                    const_symbols=const_symbols,
+                    repo_url=ctx.source_base_url,
+                    branch=ctx.repo_branch,
+                    repo_root=repo_root,
+                ),
+                doc_type="messages",
+            ))
+
         # TESTS
         sorted_test_files = sorted(ctx.detected_test_files, key=lambda tf: str(tf.path).lower())
         docs.append(DocOutput(
@@ -370,13 +405,20 @@ class MarkdownRenderer:
 
         # ER
         if ctx.er_diagram:
+            table_names = _table_names_from_diagram(ctx.er_diagram) if not ctx.er_entities else []
+            svg = render_svg(ctx.er_diagram, self.plantuml_server_url)
+            if svg:
+                docs.append(DocOutput(path=output_dir / "ER.svg", content=svg, doc_type="er"))
             docs.append(DocOutput(
                 path=output_dir / "ER.md",
                 content=self._render(
                     "ER.md.j2",
                     service_name=service_name,
                     er_diagram=ctx.er_diagram or "",
+                    er_description=er_description,
+                    has_svg=bool(svg),
                     entities=ctx.er_entities,
+                    table_names=table_names,
                     sql_functions=ctx.sql_functions,
                 ),
                 doc_type="er",

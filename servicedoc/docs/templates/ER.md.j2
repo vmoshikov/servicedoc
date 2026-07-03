@@ -1,11 +1,41 @@
 <!-- @ai:document type="er_diagram" service="{{ service_name }}" lang="ru" -->
 # 🗄️ ER-диаграмма — {{ service_name }}
 
+{% if er_description %}
+<!-- @ai:section type="er_description" -->
+{{ er_description }}
+<!-- @ai:end -->
+
+{% endif %}
+{% if has_svg %}
+<!-- @ai:section type="er_diagram" format="svg" -->
+![ER-диаграмма](./ER.svg)
+<!-- @ai:end -->
+
+<details><summary>Исходный код PlantUML</summary>
+
+```plantuml
+{{ er_diagram }}
+```
+
+</details>
+{% else %}
 <!-- @ai:section type="er_diagram" format="plantuml" -->
 ```plantuml
 {{ er_diagram }}
 ```
 <!-- @ai:end -->
+{% endif %}
+
+{% if table_names %}
+## 📋 Таблицы
+
+<!-- @ai:section type="table_list" -->
+{% for name in table_names %}
+- `{{ name }}`
+{% endfor %}
+<!-- @ai:end -->
+{% endif %}
 
 {% if sql_functions %}
 ## ⚡ Реестр SQL-функций
@@ -21,6 +51,7 @@
 <!-- @ai:end -->
 {% endif %}
 
+{% if entities %}
 ## 📋 Таблицы
 
 {% for entity in entities %}
@@ -44,4 +75,5 @@
 <!-- @ai:end -->
 
 {% endfor %}
+{% endif %}
 <!-- @ai:end -->

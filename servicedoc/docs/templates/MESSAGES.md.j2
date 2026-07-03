@@ -1,0 +1,62 @@
+<!-- @ai:document type="message_registry" service="{{ service_name }}" lang="ru" -->
+# 💬 Реестр сообщений и констант — {{ service_name }}
+
+{% if const_symbols %}
+## 🔢 Константы
+
+Все константы верхнего уровня — включая неэкспортируемые (внутренние лимиты, статусы, коды).
+
+<!-- @ai:section type="const_registry" format="table" -->
+| Имя | Значение | Тип | Описание | Файл |
+|---|---|---|---|---|
+{% for c in const_symbols | sort(attribute="name") %}
+| `{{ c.name }}` | `{{ c.value }}` | {% if c.type_name %}`{{ c.type_name }}`{% endif %} | {{ c.comment or "" }} | {{ make_source_ref(repo_url, branch, c.file_path, repo_root, c.line_start, c.line_end) }} |
+{% endfor %}
+<!-- @ai:end -->
+
+---
+
+{% endif %}
+{% if symbols %}
+## 🔀 Функции-справочники (switch → текст)
+
+Функции, сопоставляющие входное значение с фиксированным текстовым ответом (`switch` → `return "текст"`).
+Включает приватные функции — это часто внутренние справочники, а не публичное API.
+
+{% endif %}
+{% for sym in symbols %}
+<!-- @ai:section type="message_map" id="{{ sym.name }}" -->
+## {{ sym.name }}{% if sym.receiver %} `{{ sym.receiver }}`{% endif %}
+
+<!-- @ai:field name="description" -->
+{% if sym.comment %}
+{{ sym.comment }}
+{% elif sym.ai_description %}
+{{ sym.ai_description }}
+{% else %}
+> Описание недоступно.
+{% endif %}
+<!-- @ai:end -->
+
+<!-- @ai:field name="message_map" format="table" -->
+**Параметр:** `{{ sym.message_map.param_name }}`
+
+| Значение | Ответ |
+|---|---|
+{% for case in sym.message_map.cases %}
+| `{{ case.value }}` | {{ case.message }} |
+{% endfor %}
+{% if sym.message_map.default_message %}
+| *(по умолчанию)* | {{ sym.message_map.default_message }} |
+{% endif %}
+<!-- @ai:end -->
+
+<!-- @ai:field name="source" -->
+**Файл:** {{ make_source_ref(repo_url, branch, sym.file_path, repo_root, sym.line_start, sym.line_end) }}
+<!-- @ai:end -->
+<!-- @ai:end -->
+
+---
+
+{% endfor %}
+<!-- @ai:end -->

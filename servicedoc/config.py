@@ -52,3 +52,6 @@ class ServiceDocConfig(BaseSettings):
     glossary_path: Path = Field(
         default_factory=lambda: Path(__file__).resolve().parent.parent / "GLOSSARY.md"
     )
+    # ER.md's diagram is sent here to render an SVG. Point at a self-hosted
+    # PlantUML server if the schema shouldn't leave the network.
+    plantuml_server_url: str = "http://www.plantuml.com/plantuml/svg/"

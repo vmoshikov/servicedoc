@@ -7,6 +7,10 @@ from typing import ClassVar
 from servicedoc.ai.client import AIClient
 from servicedoc.ai.glossary import glossary_system_block
 from servicedoc.ai.prompts import (
+    ER_DESCRIPTION_SYSTEM,
+    ER_DESCRIPTION_USER,
+    PROVIDER_OVERVIEW_SYSTEM,
+    PROVIDER_OVERVIEW_USER,
     README_OVERVIEW_SYSTEM,
     README_OVERVIEW_USER,
     RELEASE_NOTES_SYSTEM,
@@ -39,9 +43,9 @@ class DocumentationStage(Stage):
     name: ClassVar[str] = "s09_docs"
     required: ClassVar[bool] = True
 
-    def __init__(self, ai_client: AIClient | None = None) -> None:
+    def __init__(self, ai_client: AIClient | None = None, plantuml_server_url: str | None = None) -> None:
         self.ai_client = ai_client
-        self.renderer = MarkdownRenderer()
+        self.renderer = MarkdownRenderer(**({"plantuml_server_url": plantuml_server_url} if plantuml_server_url else {}))
 
     async def run(self, ctx: PipelineContext) -> StageResult:
         if not ctx.local_repo_path:
@@ -143,10 +147,13 @@ class DocumentationStage(Stage):
 
         await self._enrich_proto_descriptions(ctx, service_name, extra_system)
         overview = await self._build_overview(ctx, tags, service_name, extra_system)
+        er_description = await self._describe_er(ctx, service_name, extra_system)
+        provider_overview = await self._describe_providers(ctx, service_name, extra_system)
         contributors = await history.author_commit_counts()
 
         docs = await self.renderer.render_all(
             ctx, release_notes=release_notes, overview=overview, contributors=contributors,
+            er_description=er_description, provider_overview=provider_overview,
         )
         logger.info("Generated %d documentation files", len(docs))
         return StageResult(stage_name=self.name, success=True)
@@ -273,4 +280,43 @@ class DocumentationStage(Stage):
             return await self.ai_client.complete(system, user_prompt)
         except Exception as exc:
             logger.warning("AI README overview failed: %s", exc)
+            return None
+
+    async def _describe_er(
+        self, ctx: PipelineContext, service_name: str, extra_system: str | None,
+    ) -> str | None:
+        """Short, neutral technical description of the ER diagram — no
+        quality judgments, just what's actually there (entity count,
+        relation patterns, notable structural traits)."""
+        if not self.ai_client or not ctx.er_diagram:
+            return None
+        from jinja2 import Template
+        user_prompt = Template(ER_DESCRIPTION_USER).render(
+            service_name=service_name,
+            diagram=ctx.er_diagram,
+            sql_functions=[f.name for f in ctx.sql_functions],
+        )
+        system = ER_DESCRIPTION_SYSTEM + (f"\n\n{extra_system}" if extra_system else "")
+        try:
+            return await self.ai_client.complete(system, user_prompt)
+        except Exception as exc:
+            logger.warning("AI ER description failed: %s", exc)
+            return None
+
+    async def _describe_providers(
+        self, ctx: PipelineContext, service_name: str, extra_system: str | None,
+    ) -> str | None:
+        """Short description of what external systems/libraries the
+        service's provider/ wrappers integrate with."""
+        if not self.ai_client or not ctx.provider_names:
+            return None
+        from jinja2 import Template
+        user_prompt = Template(PROVIDER_OVERVIEW_USER).render(
+            service_name=service_name, provider_names=ctx.provider_names,
+        )
+        system = PROVIDER_OVERVIEW_SYSTEM + (f"\n\n{extra_system}" if extra_system else "")
+        try:
+            return await self.ai_client.complete(system, user_prompt)
+        except Exception as exc:
+            logger.warning("AI provider overview failed: %s", exc)
             return None

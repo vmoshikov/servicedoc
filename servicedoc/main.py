@@ -52,7 +52,7 @@ def build_pipeline(cfg: ServiceDocConfig):
         if ai_client else CommentExtractionStage(),
         TestCoverageStage(),
         ERDiagramStage(ai_client),
-        DocumentationStage(ai_client),
+        DocumentationStage(ai_client, plantuml_server_url=cfg.plantuml_server_url),
     ]
     return PipelineRunner(stages, cfg)
 
@@ -64,8 +64,9 @@ def analyze(
     output: Annotated[Path, typer.Option("--output", "-o")] = Path("./servicedoc_output"),
     skip: Annotated[list[str], typer.Option("--skip", "-s")] = [],
     config_file: Annotated[Path | None, typer.Option("--config", "-c")] = None,
-    name: Annotated[str | None, typer.Option("--name", "-n", help="Display name, if it doesn't match the repo URL")] = None,
+    name: Annotated[str | None, typer.Option("--name", "-n", help="Display name inserted everywhere in the generated docs")] = None,
     proto_repo: Annotated[str | None, typer.Option("--proto-repo", help="Separate repo holding .proto contracts, if not in this repo (supports @branch suffix)")] = None,
+    proto_name: Annotated[str | None, typer.Option("--proto-name", help="Path segment used to find this service's own .proto files (falls back to --name)")] = None,
 ) -> None:
     """Analyze a git repository and generate documentation."""
     env_file = str(config_file) if config_file else ".env"
@@ -74,7 +75,9 @@ def analyze(
     cfg.skip_stages = list(skip)
 
     pipeline = build_pipeline(cfg)
-    repo_config = RepoConfig(url=url, branch=branch, name=name, proto_repo_url=proto_repo)
+    repo_config = RepoConfig(
+        url=url, branch=branch, name=name, proto_repo_url=proto_repo, proto_name=proto_name,
+    )
 
     typer.echo(f"Analyzing: {url}")
     ctx = asyncio.run(pipeline.run(repo_config))

@@ -10,7 +10,7 @@ from .docs import ChangelogEntry
 from .er import EREntity, ERRelation, SqlFunction
 from .proto import ProtoMessage, ProtoService
 from .repo import ExternalDep, RepoConfig
-from .symbols import Symbol
+from .symbols import ConstSymbol, FunctionSymbol, Symbol
 
 T = TypeVar("T")
 
@@ -169,6 +169,24 @@ class PipelineContext(BaseModel):
         coverage matching."""
         root = self.local_repo_path
         return [s for s in self.symbols if s.is_public and _is_test_symbol(s, root)]
+
+    @property
+    def message_map_symbols(self) -> list[FunctionSymbol]:
+        """Functions/methods whose body is a `switch param { case "x":
+        return "msg" }` string lookup — surfaced regardless of export status,
+        since these are often private helpers (e.g. an operation-type-to-title
+        map) that are still worth documenting as a request→response registry."""
+        return [
+            s for s in self.symbols
+            if isinstance(s, FunctionSymbol) and s.message_map is not None
+        ]
+
+    @property
+    def const_symbols(self) -> list[ConstSymbol]:
+        """All top-level constants — exported or not, since these are
+        internal reference data (status codes, limits, enum-style values)
+        worth surfacing in the registry regardless of visibility."""
+        return [s for s in self.symbols if isinstance(s, ConstSymbol)]
 
     @property
     def provider_names(self) -> list[str]:

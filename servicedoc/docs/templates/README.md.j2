@@ -13,10 +13,6 @@
 | Язык | {{ detected_language | title }} |
 | Публичных символов | {{ public_symbol_count }} |
 | Proto сервисов | {{ proto_service_count }} |
-| Тестовых файлов | {{ test_file_count }} |
-{% if coverage_pct is not none %}
-| Покрытие тестами | {{ coverage_pct }}% |
-{% endif %}
 | Внешних зависимостей | {{ external_dep_count }} |
 <!-- @ai:end -->
 
@@ -25,43 +21,22 @@
 - 🔌 [API](./API.md) — gRPC-сервисы и proto-сообщения (внешний контракт)
 - ⚙️ [Функции и методы](./FUNCTIONS.md) — остальной публичный код сервиса
 - 🧱 [Структуры](./STRUCTURES.md) — публичные структуры и классы вне proto-контракта
+{% if has_messages %}
+- 💬 [Сообщения](./MESSAGES.md) — функции-справочники текстовых ответов (switch → текст)
+{% endif %}
 {% if has_tests %}
 - 🧪 [Тесты](./TESTS.md) — покрытие и список тестовых файлов
 {% endif %}
 {% if has_er %}
-- 🗄️ [ER-диаграмма](./ER.md) — схема базы данных
+- 🗄️ [ER-диаграмма](./ER.md) — схема базы данных и SQL-функции
 {% endif %}
 - 📝 [CHANGELOG](./CHANGELOG.md) — история изменений по тегам
 {% if has_release_notes %}
 - 📦 [Release Notes](./RELEASE_NOTES/) — детальные заметки к каждому релизу
 {% endif %}
 
-{% if external_deps %}
-## 📚 Внешние зависимости
-
-<!-- @ai:section type="external_deps" -->
-| Репозиторий | Версия | Импортируемые пакеты |
-|---|---|---|
-{% for dep in external_deps %}
-| {{ dep.dependency.name }} | {{ dep.dependency.version }} | {{ dep.imported_symbols | join(", ") }} |
-{% endfor %}
-<!-- @ai:end -->
-{% endif %}
-
-{% if provider_names %}
-## 🔌 Провайдеры
-
-<!-- @ai:section type="providers" -->
-Обёртки над сторонними/стандартными библиотеками — не документируются функция за функцией:
-
-{% for name in provider_names %}
-- `{{ name }}`
-{% endfor %}
-<!-- @ai:end -->
-{% endif %}
-
 {% if test_match_report %}
-## 🧪 Сводка по тестам
+## 🧪 Тесты
 
 <!-- @ai:section type="test_summary" -->
 | Метрика | Значение |
@@ -76,6 +51,34 @@
 <!-- @ai:end -->
 {% endif %}
 
+{% if provider_names %}
+## 🔌 Провайдеры
+
+<!-- @ai:section type="providers" -->
+{% if provider_overview %}
+{{ provider_overview }}
+
+{% endif %}
+Обёртки над сторонними/стандартными библиотеками — не документируются функция за функцией:
+
+{% for name in provider_names %}
+- `{{ name }}`
+{% endfor %}
+<!-- @ai:end -->
+{% endif %}
+
+{% if external_deps %}
+## 📚 Внешние зависимости
+
+<!-- @ai:section type="external_deps" -->
+| Репозиторий | Версия | Импортируемые пакеты |
+|---|---|---|
+{% for dep in external_deps %}
+| {{ dep.dependency.name }} | {{ dep.dependency.version }} | {{ dep.imported_symbols | join(", ") }} |
+{% endfor %}
+<!-- @ai:end -->
+{% endif %}
+
 {% if contributors %}
 ## 👥 Разработчики
 
@@ -86,11 +89,5 @@
 | {{ name }} | {{ email }} | {{ count }} |
 {% endfor %}
 <!-- @ai:end -->
-{% endif %}
-
-{% if has_er %}
-## 🗄️ Архитектура базы данных
-
-ER-диаграмма сервиса — см. [ER.md](./ER.md).
 {% endif %}
 <!-- @ai:end -->
