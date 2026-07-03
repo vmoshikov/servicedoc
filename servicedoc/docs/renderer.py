@@ -295,7 +295,7 @@ class MarkdownRenderer:
         ctx: PipelineContext,
         release_notes: list[ReleaseNote] | None = None,
         overview: str | None = None,
-        contributors: list[tuple[str, int]] | None = None,
+        contributors: list[tuple[str, str, int]] | None = None,
     ) -> list[DocOutput]:
         output_dir = ctx.output_dir
         service_name = _service_name(ctx)
@@ -319,7 +319,7 @@ class MarkdownRenderer:
                 external_deps=ctx.external_deps,
                 has_proto=bool(ctx.proto_services),
                 has_tests=bool(ctx.coverage_result),
-                has_er=bool(ctx.er_entities),
+                has_er=bool(ctx.er_diagram),
                 has_release_notes=bool(release_notes),
                 overview=overview,
                 contributors=contributors or [],
@@ -369,7 +369,7 @@ class MarkdownRenderer:
         ))
 
         # ER
-        if ctx.er_entities:
+        if ctx.er_diagram:
             docs.append(DocOutput(
                 path=output_dir / "ER.md",
                 content=self._render(
@@ -377,6 +377,7 @@ class MarkdownRenderer:
                     service_name=service_name,
                     er_diagram=ctx.er_diagram or "",
                     entities=ctx.er_entities,
+                    sql_functions=ctx.sql_functions,
                 ),
                 doc_type="er",
             ))

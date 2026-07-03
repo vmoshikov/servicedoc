@@ -28,10 +28,13 @@
 {% endfor %}
 {% endif %}
 {% if content.messages %}
-**📨 Сообщения**
+<details><summary>📨 Сообщения ({{ content.messages | length }})</summary>
+
 {% for msg in content.messages %}
 - [`{{ msg.name }}`](#{{ make_anchor(group + "-" + msg.name) }})
 {% endfor %}
+
+</details>
 {% endif %}
 
 {% endfor %}
@@ -44,6 +47,7 @@
 
 {% for svc in content.services %}
 <!-- @ai:section type="grpc_service" id="{{ group }}-{{ svc.name }}" -->
+<a id="{{ make_anchor(group + "-" + svc.name) }}"></a>
 ### {{ svc.name }}
 
 <!-- @ai:field name="description" -->
@@ -100,6 +104,7 @@ rpc {{ method.name }}({% if method.client_streaming %}stream {% endif %}{{ metho
 {% endfor %}
 {% for msg in content.messages %}
 <!-- @ai:section type="proto_message" id="{{ group }}-{{ msg.name }}" -->
+<a id="{{ make_anchor(group + "-" + msg.name) }}"></a>
 ### {{ msg.name }}
 
 <!-- @ai:field name="description" -->

@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from .coverage import CoverageResult, TestFile, TestMatchReport
 from .docs import ChangelogEntry
-from .er import EREntity, ERRelation
+from .er import EREntity, ERRelation, SqlFunction
 from .proto import ProtoMessage, ProtoService
 from .repo import ExternalDep, RepoConfig
 from .symbols import Symbol
@@ -61,9 +61,13 @@ def _is_provider_symbol(s: Symbol, root: Path | None) -> bool:
     return any(part.lower() == _PROVIDER_DIR_NAME for part in rel_parts)
 
 
+_PROVIDER_NAME_DEPTH = 2  # category/vendor, e.g. "db/postgres" — not its internal orm/repository/... layout
+
+
 def _provider_names(file_paths: list[Path], root: Path | None) -> list[str]:
-    """Unique provider identifiers, e.g. `provider/db/postgres/...` and
-    `provider/db/redis/...` → ["db/postgres", "db/redis"]."""
+    """Unique provider identifiers, capped at category/vendor depth, e.g.
+    `provider/db/postgres/orm/conf/...` and `provider/db/postgres/repository/...`
+    both collapse to "db/postgres" instead of listing every internal subpackage."""
     names: set[str] = set()
     for path in file_paths:
         try:
@@ -76,7 +80,7 @@ def _provider_names(file_paths: list[Path], root: Path | None) -> list[str]:
         idx = parts_lower.index(_PROVIDER_DIR_NAME)
         after = parts[idx + 1:-1]  # dirs after provider/, excluding the filename
         if after:
-            names.add("/".join(after))
+            names.add("/".join(after[:_PROVIDER_NAME_DEPTH]))
     return sorted(names)
 
 
@@ -111,6 +115,10 @@ class PipelineContext(BaseModel):
     er_entities: list[EREntity] = []
     er_relations: list[ERRelation] = []
     er_diagram: str | None = None
+    # current-state registry of SQL functions/procedures found in migrations
+    # (CREATE FUNCTION adds/updates, DROP FUNCTION removes) — built alongside
+    # er_diagram, same incremental AI pass over migration batches.
+    sql_functions: list[SqlFunction] = []
     coverage_result: CoverageResult | None = None
     test_match_report: TestMatchReport | None = None
     # detected independently of whether a coverage report (coverage.out/.xml)

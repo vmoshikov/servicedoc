@@ -51,7 +51,7 @@ def build_pipeline(cfg: ServiceDocConfig):
         AIEnrichmentStage(ai_client, cfg.ai.batch_size, cfg.max_concurrent_ai_calls)
         if ai_client else CommentExtractionStage(),
         TestCoverageStage(),
-        ERDiagramStage(),
+        ERDiagramStage(ai_client),
         DocumentationStage(ai_client),
     ]
     return PipelineRunner(stages, cfg)

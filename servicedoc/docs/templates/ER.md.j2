@@ -1,5 +1,5 @@
 <!-- @ai:document type="er_diagram" service="{{ service_name }}" lang="ru" -->
-# ER-диаграмма — {{ service_name }}
+# 🗄️ ER-диаграмма — {{ service_name }}
 
 <!-- @ai:section type="er_diagram" format="plantuml" -->
 ```plantuml
@@ -7,7 +7,21 @@
 ```
 <!-- @ai:end -->
 
-## Таблицы
+{% if sql_functions %}
+## ⚡ Реестр SQL-функций
+
+Актуальное состояние — функции, удалённые через `DROP FUNCTION` в миграциях, в реестре не отображаются.
+
+<!-- @ai:section type="sql_functions" format="table" -->
+| Функция | Сигнатура | Возвращает | Язык | Описание |
+|---|---|---|---|---|
+{% for fn in sql_functions | sort(attribute="name") %}
+| `{{ fn.name }}` | `{{ fn.signature }}` | `{{ fn.returns }}` | {{ fn.language }} | {{ fn.description }} |
+{% endfor %}
+<!-- @ai:end -->
+{% endif %}
+
+## 📋 Таблицы
 
 {% for entity in entities %}
 <!-- @ai:section type="table_description" id="{{ entity.effective_table_name }}" -->

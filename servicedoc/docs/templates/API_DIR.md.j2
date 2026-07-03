@@ -19,7 +19,7 @@
 {% if funcs_sorted %}
 **⚙️ Функции и методы**
 {% for sym in funcs_sorted %}
-- [`{{ sym.name }}`](#{{ make_anchor(sym.name) }}){% if sym.receiver %} `{{ sym.receiver }}`{% endif %}
+- [`{{ sym.name }}`](#{{ make_anchor(sym.name + (sym.receiver or "")) }}){% if sym.receiver %} `{{ sym.receiver }}`{% endif %}
 
 {% endfor %}
 {% endif %}
@@ -30,6 +30,7 @@
 {% if classes_sorted %}
 {% for cls in classes_sorted %}
 <!-- @ai:section type="class" id="{{ cls.name }}" -->
+<a id="{{ make_anchor(cls.name) }}"></a>
 ## {{ cls.name }}
 
 <!-- @ai:field name="description" -->
@@ -86,6 +87,7 @@ type {{ cls.name }}{{ cls.type_params or "" }} struct {
 {% if funcs_sorted %}
 {% for sym in funcs_sorted %}
 <!-- @ai:section type="{{ sym.kind }}" id="{{ sym.name }}" -->
+<a id="{{ make_anchor(sym.name + (sym.receiver or "")) }}"></a>
 ## {{ sym.name }}{% if sym.receiver %} `{{ sym.receiver }}`{% endif %}
 
 <!-- @ai:field name="description" -->

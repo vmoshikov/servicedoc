@@ -38,3 +38,13 @@ class ERRelation(BaseModel):
     kind: Literal["one_to_one", "one_to_many", "many_to_many"]
     label: str = ""
     is_inferred: bool = False
+
+
+class SqlFunction(BaseModel):
+    """A stored SQL function/procedure tracked across migrations — reflects
+    the current state only (DROP FUNCTION removes it from the registry)."""
+    name: str
+    signature: str = ""
+    returns: str = ""
+    language: str = ""
+    description: str = ""

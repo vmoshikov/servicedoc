@@ -80,10 +80,10 @@
 ## 👥 Разработчики
 
 <!-- @ai:section type="contributors" -->
-| Автор | Коммитов |
-|---|---|
-{% for name, count in contributors %}
-| {{ name }} | {{ count }} |
+| Автор | Email | Коммитов |
+|---|---|---|
+{% for name, email, count in contributors %}
+| {{ name }} | {{ email }} | {{ count }} |
 {% endfor %}
 <!-- @ai:end -->
 {% endif %}
