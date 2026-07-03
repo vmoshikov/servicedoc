@@ -27,9 +27,14 @@ class TypeRegistry:
 
     def __init__(self, ctx: PipelineContext) -> None:
         self.proto_by_name: dict[str, ProtoMessage] = {m.name: m for m in ctx.proto_messages}
+        # generated_symbols (vendored .pb.go with no local .proto) are a
+        # fallback source only — real parsed symbols win on a name collision.
         self.struct_by_name: dict[str, ClassSymbol] = {
-            s.name: s for s in ctx.symbols if isinstance(s, ClassSymbol) and s.kind == "struct"
+            s.name: s for s in ctx.generated_symbols if isinstance(s, ClassSymbol) and s.kind == "struct"
         }
+        self.struct_by_name.update({
+            s.name: s for s in ctx.symbols if isinstance(s, ClassSymbol) and s.kind == "struct"
+        })
 
     def example_for_type_ref(self, type_ref: TypeRef) -> object | None:
         return _resolve(type_ref.name, self, seen=frozenset())
@@ -70,7 +75,12 @@ def _resolve(type_name: str, registry: TypeRegistry, seen: frozenset[str], depth
     if struct := registry.struct_by_name.get(type_name):
         obj = {}
         for param in struct.fields:
-            obj[param.name] = _resolve(param.type_ref.name, registry, seen | {type_name}, depth + 1)
+            if not param.name or not param.name[0].isupper():
+                continue  # unexported field — Go never marshals it to JSON
+            if param.json_name == "-":
+                continue  # explicit json:"-" — excluded from JSON
+            key = param.json_name or param.name
+            obj[key] = _resolve(param.type_ref.name, registry, seen | {type_name}, depth + 1)
         return obj
 
     return None

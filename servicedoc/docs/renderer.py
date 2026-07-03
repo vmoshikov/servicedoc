@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from collections import defaultdict
 from pathlib import Path
 
@@ -11,7 +12,8 @@ from servicedoc.docs.changelog import deduplicate, group_entries
 from servicedoc.docs.json_example import TypeRegistry
 from servicedoc.models.docs import DocOutput, ReleaseNote
 from servicedoc.models.pipeline import PipelineContext
-from servicedoc.models.symbols import Symbol, TypeRef
+from servicedoc.models.proto import ProtoMessage, ProtoService
+from servicedoc.models.symbols import ClassSymbol, FunctionSymbol, Symbol, TypeRef
 from servicedoc.utils.source_links import make_source_ref
 
 logger = logging.getLogger(__name__)
@@ -20,6 +22,8 @@ TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 
 def _service_name(ctx: PipelineContext) -> str:
+    if ctx.repo_config.name:
+        return ctx.repo_config.name
     url = ctx.repo_config.url
     if "@" in url:
         url = url.rsplit("@", 1)[0]
@@ -46,21 +50,20 @@ def _group_symbols_by_dir(
 
 
 def _make_anchor(text: str) -> str:
-    import re
     return re.sub(r"[^\w\- ]", "", text.lower()).replace(" ", "-")
 
 
-def _dir_to_file_path(dir_name: str) -> str:
-    """Convert dir key to relative file path under api/. '.' → api/root.md"""
+def _dir_to_file_path(dir_name: str, prefix: str) -> str:
+    """Convert dir key to relative file path under `prefix/`. '.' → prefix/root.md"""
     if dir_name == ".":
-        return "api/root.md"
-    return f"api/{dir_name}.md"
+        return f"{prefix}/root.md"
+    return f"{prefix}/{dir_name}.md"
 
 
-def _back_link(file_path: str) -> str:
-    """Relative link back to API.md from a nested api/ file."""
+def _back_link(file_path: str, index_name: str) -> str:
+    """Relative link back to the family index (API.md / FUNCTIONS.md / ...) from a nested file."""
     depth = file_path.count("/")
-    return "../" * depth + "API.md"
+    return "../" * depth + index_name
 
 
 _NAV_CATEGORY_ORDER = ["core", "app", "entity", "usecase", "provider", "controller"]
@@ -78,6 +81,72 @@ def _categorize_dirs(dir_names: list[str]) -> dict[str, list[str]]:
         matched = next((c for c in _NAV_CATEGORY_ORDER if c in parts), None)
         categories[(matched or _NAV_OTHER_LABEL)].append(dir_name)
     return {k: sorted(v) for k, v in categories.items() if v}
+
+
+_FUNCS_KINDS = ("function", "method")
+_STRUCTS_KINDS = ("class", "struct", "interface")
+
+_PROTO_MAP_TYPE_RE = re.compile(r"^map<\s*\w+\s*,\s*(\w+)\s*>$")
+
+
+def _all_type_ref_names(symbols: list[Symbol]) -> set[str]:
+    """Every type name referenced anywhere in the parsed code (params, return
+    types, struct fields) — used to figure out which proto messages this
+    service's Go code actually touches."""
+    names: set[str] = set()
+    for sym in symbols:
+        if isinstance(sym, FunctionSymbol):
+            for p in sym.parameters:
+                names.add(p.type_ref.name)
+            for r in sym.return_types:
+                names.add(r.name)
+        elif isinstance(sym, ClassSymbol):
+            for f in sym.fields:
+                names.add(f.type_ref.name)
+    return names
+
+
+def _relevant_proto_objects(ctx: PipelineContext) -> tuple[list[ProtoService], list[ProtoMessage]]:
+    """A shared/vendored proto repo can hold contracts for many unrelated
+    services. Keep only what this service's Go code actually touches: a
+    service is relevant if a Go method name matches one of its RPCs; a
+    message is relevant if it's referenced directly by Go code, is an
+    input/output of a relevant RPC, or is reachable from either by walking
+    nested message fields."""
+    proto_by_name = {m.name: m for m in ctx.proto_messages}
+    used_type_names = _all_type_ref_names(ctx.symbols)
+    used_method_names = {s.name for s in ctx.symbols if s.kind in _FUNCS_KINDS}
+
+    relevant_services = [
+        svc for svc in ctx.proto_services
+        if any(m.name in used_method_names for m in svc.methods)
+    ]
+
+    seed_names = used_type_names & proto_by_name.keys()
+    for svc in relevant_services:
+        for m in svc.methods:
+            seed_names.add(m.input_type)
+            seed_names.add(m.output_type)
+
+    relevant_names: set[str] = set()
+    queue = list(seed_names)
+    while queue:
+        name = queue.pop()
+        if name in relevant_names:
+            continue
+        msg = proto_by_name.get(name)
+        if msg is None:
+            continue
+        relevant_names.add(name)
+        for field in msg.fields:
+            candidate = field.type
+            if m := _PROTO_MAP_TYPE_RE.match(field.type):
+                candidate = m.group(1)
+            if candidate in proto_by_name and candidate not in relevant_names:
+                queue.append(candidate)
+
+    relevant_messages = [m for m in ctx.proto_messages if m.name in relevant_names]
+    return relevant_services, relevant_messages
 
 
 class MarkdownRenderer:
@@ -123,41 +192,55 @@ class MarkdownRenderer:
         self.env.globals["json_example"] = json_example
         self.env.globals["json_example_for_name"] = json_example_for_name
 
-    def _render_api_docs(
+    def _set_proto_source_ref_global(self, ctx: PipelineContext) -> None:
+        local_root = ctx.local_repo_path or Path("/")
+        proto_root = ctx.proto_repo_path
+
+        def proto_source_ref(file_path: Path, line_start: int, line_end: int | None = None) -> str:
+            if proto_root is not None:
+                try:
+                    file_path.relative_to(proto_root)
+                    return make_source_ref(
+                        ctx.proto_repo_base_url, ctx.proto_repo_branch, file_path, proto_root, line_start, line_end,
+                    )
+                except ValueError:
+                    pass
+            return make_source_ref(ctx.source_base_url, ctx.repo_branch, file_path, local_root, line_start, line_end)
+
+        self.env.globals["proto_source_ref"] = proto_source_ref
+
+    def _render_symbol_family_docs(
         self,
         ctx: PipelineContext,
         service_name: str,
         output_dir: Path,
+        symbols: list[Symbol],
+        dir_prefix: str,
+        index_filename: str,
+        title: str,
+        doc_type: str,
     ) -> list[DocOutput]:
-        """Render API.md index + one file per directory + optional grpc.md."""
+        """Generic: index + one file per directory for a symbol subset
+        (funcs-only for FUNCTIONS.md, structs-only for STRUCTURES.md)."""
         repo_root = ctx.local_repo_path or Path("/")
-        public = ctx.public_symbols
-        symbol_groups = _group_symbols_by_dir(public, repo_root)
+        symbol_groups = _group_symbols_by_dir(symbols, repo_root)
         docs: list[DocOutput] = []
 
-        # build mapping dir_name → relative file path (for the index)
-        dir_files: dict[str, str] = {
-            dir_name: _dir_to_file_path(dir_name)
-            for dir_name in symbol_groups
-        }
-        dir_counts: dict[str, int] = {
-            dir_name: len(syms) for dir_name, syms in symbol_groups.items()
-        }
+        dir_files = {d: _dir_to_file_path(d, dir_prefix) for d in symbol_groups}
+        dir_counts = {d: len(s) for d, s in symbol_groups.items()}
         nav_categories = _categorize_dirs(list(symbol_groups.keys()))
 
-        # API.md — index only
         index_content = self._render(
-            "API.md.j2",
+            "SYMBOL_INDEX.md.j2",
             service_name=service_name,
+            title=title,
+            doc_type=doc_type,
             nav_categories=nav_categories,
             dir_files=dir_files,
             dir_counts=dir_counts,
-            proto_services=ctx.proto_services,
-            make_anchor=_make_anchor,
         )
-        docs.append(DocOutput(path=output_dir / "API.md", content=index_content, doc_type="api"))
+        docs.append(DocOutput(path=output_dir / index_filename, content=index_content, doc_type=doc_type))
 
-        # one file per directory
         common = dict(
             service_name=service_name,
             repo_url=ctx.source_base_url,
@@ -166,36 +249,29 @@ class MarkdownRenderer:
             make_anchor=_make_anchor,
         )
         for dir_name, syms in symbol_groups.items():
-            rel_file = _dir_to_file_path(dir_name)
+            rel_file = dir_files[dir_name]
             dir_content = self._render(
                 "API_DIR.md.j2",
                 dir_name=dir_name,
                 symbols=syms,
-                back_link=_back_link(rel_file),
+                back_link=_back_link(rel_file, index_filename),
                 **common,
             )
-            docs.append(DocOutput(
-                path=output_dir / rel_file,
-                content=dir_content,
-                doc_type="api",
-            ))
-
-        # grpc.md
-        if ctx.proto_services:
-            grpc_content = self._render(
-                "API_GRPC.md.j2",
-                service_name=service_name,
-                proto_services=ctx.proto_services,
-                back_link=_back_link("api/grpc.md"),
-                make_anchor=_make_anchor,
-            )
-            docs.append(DocOutput(
-                path=output_dir / "api" / "grpc.md",
-                content=grpc_content,
-                doc_type="api",
-            ))
+            docs.append(DocOutput(path=output_dir / rel_file, content=dir_content, doc_type=doc_type))
 
         return docs
+
+    def _render_proto_api_md(self, ctx: PipelineContext, service_name: str, output_dir: Path) -> DocOutput:
+        relevant_services, relevant_messages = _relevant_proto_objects(ctx)
+        self._set_proto_source_ref_global(ctx)
+        content = self._render(
+            "API.md.j2",
+            service_name=service_name,
+            proto_services=relevant_services,
+            proto_messages=relevant_messages,
+            make_anchor=_make_anchor,
+        )
+        return DocOutput(path=output_dir / "API.md", content=content, doc_type="api")
 
     async def render_all(
         self,
@@ -232,8 +308,28 @@ class MarkdownRenderer:
             doc_type="readme",
         ))
 
-        # API — index + per-directory files
-        docs.extend(self._render_api_docs(ctx, service_name, output_dir))
+        # API.md — proto-only (gRPC services + messages actually used by this service)
+        docs.append(self._render_proto_api_md(ctx, service_name, output_dir))
+
+        # FUNCTIONS.md — all public functions/methods, dir-based
+        docs.extend(self._render_symbol_family_docs(
+            ctx, service_name, output_dir,
+            symbols=[s for s in public_symbols if s.kind in _FUNCS_KINDS],
+            dir_prefix="functions",
+            index_filename="FUNCTIONS.md",
+            title="Функции и методы",
+            doc_type="functions",
+        ))
+
+        # STRUCTURES.md — all public structs/classes/interfaces, dir-based
+        docs.extend(self._render_symbol_family_docs(
+            ctx, service_name, output_dir,
+            symbols=[s for s in public_symbols if s.kind in _STRUCTS_KINDS],
+            dir_prefix="structures",
+            index_filename="STRUCTURES.md",
+            title="Структуры",
+            doc_type="structures",
+        ))
 
         # TESTS
         raw_test_files = ctx.coverage_result.test_files if ctx.coverage_result else []

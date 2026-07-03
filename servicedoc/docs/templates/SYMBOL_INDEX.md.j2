@@ -1,0 +1,17 @@
+<!-- @ai:document type="{{ doc_type }}" service="{{ service_name }}" lang="ru" -->
+# {{ title }} — {{ service_name }}
+
+<!-- @ai:section type="toc" -->
+## Содержание
+
+{% for category, dirs in nav_categories.items() %}
+### {{ category }}
+
+{% for dir_name in dirs %}
+- [`{{ dir_name }}/`]({{ dir_files[dir_name] }}) — {{ dir_counts[dir_name] }} символов
+{% endfor %}
+
+{% endfor %}
+<!-- @ai:end -->
+
+<!-- @ai:end -->

@@ -17,6 +17,7 @@ class TypeRef(BaseModel):
 class Parameter(BaseModel):
     name: str
     type_ref: TypeRef
+    json_name: str | None = None  # from a `json:"..."` struct tag, if present
 
 
 class Symbol(BaseModel):

@@ -42,6 +42,10 @@ class PipelineContext(BaseModel):
     external_deps: list[ExternalDep] = []
     proto_services: list[ProtoService] = []
     proto_messages: list[ProtoMessage] = []
+    # structs parsed from generated files (.pb.go, ...) that are excluded from
+    # docs entirely — kept only so json_example() can resolve vendored
+    # request/response types that have no accompanying .proto in this repo.
+    generated_symbols: list[Symbol] = []
     er_entities: list[EREntity] = []
     er_relations: list[ERRelation] = []
     er_diagram: str | None = None
@@ -52,6 +56,10 @@ class PipelineContext(BaseModel):
     # source link helpers
     repo_branch: str = "main"
     source_base_url: str = ""   # normalized repo URL for link generation
+    # separate repo holding .proto contracts (proto_repo_url), if configured
+    proto_repo_path: Path | None = None
+    proto_repo_branch: str = "main"
+    proto_repo_base_url: str = ""
 
     @property
     def public_symbols(self) -> list[Symbol]:

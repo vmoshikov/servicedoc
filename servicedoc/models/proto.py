@@ -14,6 +14,9 @@ class ProtoField(BaseModel):
 class ProtoMessage(BaseModel):
     name: str
     fields: list[ProtoField] = []
+    file_path: Path | None = None
+    line_start: int | None = None
+    line_end: int | None = None
 
     def to_json_schema(self) -> dict:
         return {
@@ -28,9 +31,12 @@ class ProtoMethod(BaseModel):
     output_type: str
     client_streaming: bool = False
     server_streaming: bool = False
+    line: int | None = None
 
 
 class ProtoService(BaseModel):
     name: str
     methods: list[ProtoMethod] = []
     file_path: Path
+    line_start: int | None = None
+    line_end: int | None = None

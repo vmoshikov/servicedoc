@@ -1,20 +1,96 @@
-<!-- @ai:document type="api_reference_index" service="{{ service_name }}" lang="ru" -->
+<!-- @ai:document type="api_reference" service="{{ service_name }}" lang="ru" -->
 # API — {{ service_name }}
+
+Только объекты, определённые в .proto-контрактах (gRPC-сервисы и сообщения).
+Остальной код сервиса — см. [FUNCTIONS.md](./FUNCTIONS.md) и [STRUCTURES.md](./STRUCTURES.md).
 
 <!-- @ai:section type="toc" -->
 ## Содержание
 
-{% for category, dirs in nav_categories.items() %}
-### {{ category }}
-
-{% for dir_name in dirs %}
-- [`{{ dir_name }}/`]({{ dir_files[dir_name] }}) — {{ dir_counts[dir_name] }} символов
-{% endfor %}
-
-{% endfor %}
 {% if proto_services %}
-- [gRPC Сервисы](api/grpc.md) — {{ proto_services | length }} сервисов
+**gRPC сервисы**
+{% for svc in proto_services %}
+- [`{{ svc.name }}`](#{{ make_anchor(svc.name) }})
+{% for method in svc.methods %}
+  - [`{{ method.name }}`](#{{ make_anchor(svc.name + "-" + method.name) }})
+{% endfor %}
+{% endfor %}
+
+{% endif %}
+{% if proto_messages %}
+**Сообщения**
+{% for msg in proto_messages %}
+- [`{{ msg.name }}`](#{{ make_anchor(msg.name) }})
+{% endfor %}
 {% endif %}
 <!-- @ai:end -->
 
+---
+
+{% for svc in proto_services %}
+<!-- @ai:section type="grpc_service" id="{{ svc.name }}" -->
+## {{ svc.name }}
+
+<!-- @ai:field name="source" -->
+**Файл:** {{ proto_source_ref(svc.file_path, svc.line_start, svc.line_end) }}
+<!-- @ai:end -->
+
+{% for method in svc.methods %}
+<!-- @ai:section type="rpc_method" id="{{ svc.name }}-{{ method.name }}" -->
+### {{ method.name }}
+
+<!-- @ai:field name="signature" -->
+```
+rpc {{ method.name }}({% if method.client_streaming %}stream {% endif %}{{ method.input_type }})
+  returns ({% if method.server_streaming %}stream {% endif %}{{ method.output_type }})
+```
+<!-- @ai:end -->
+{% if method.line %}
+
+<!-- @ai:field name="source" -->
+**Строка:** {{ proto_source_ref(svc.file_path, method.line) }}
+<!-- @ai:end -->
+{% endif %}
+<!-- @ai:end -->
+
+{% endfor %}
+<!-- @ai:end -->
+
+---
+
+{% endfor %}
+{% for msg in proto_messages %}
+<!-- @ai:section type="proto_message" id="{{ msg.name }}" -->
+## {{ msg.name }}
+
+{% if msg.fields %}
+<!-- @ai:field name="fields" format="table" -->
+| Поле | Тип |
+|---|---|
+{% for f in msg.fields %}
+| `{{ f.name }}` | `{% if f.label == "repeated" %}repeated {% endif %}{{ f.type }}` |
+{% endfor %}
+<!-- @ai:end -->
+
+{% set example = json_example_for_name(msg.name) %}
+{% if example %}
+<!-- @ai:field name="example" format="json" -->
+**Пример JSON:**
+```json
+{{ example }}
+```
+<!-- @ai:end -->
+
+{% endif %}
+{% endif %}
+{% if msg.file_path and msg.line_start %}
+<!-- @ai:field name="source" -->
+**Файл:** {{ proto_source_ref(msg.file_path, msg.line_start, msg.line_end) }}
+<!-- @ai:end -->
+{% endif %}
+<!-- @ai:end -->
+
+---
+
+{% endfor %}
 <!-- @ai:end -->

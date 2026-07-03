@@ -11,6 +11,8 @@ class RepoConfig(BaseModel):
     url: str
     branch: str = "main"
     tag: str | None = None
+    name: str | None = None  # display name override, when it doesn't match the repo/URL slug
+    proto_repo_url: str | None = None  # separate repo holding .proto contracts, if not in this repo
 
     @computed_field
     @property

@@ -9,10 +9,10 @@ _RPC = re.compile(
     r"^\s*rpc\s+(\w+)\s*\((stream\s+)?(\w+)\)\s*returns\s*\((stream\s+)?(\w+)\)"
 )
 _FIELD = re.compile(
-    r"^\s*(repeated\s+|optional\s+|required\s+)?(\w[\w.]+)\s+(\w+)\s*=\s*(\d+)\s*;"
+    r"^\s*(repeated\s+|optional\s+|required\s+)?(\w[\w.]+)\s+(\w+)\s*=\s*(\d+)\s*(?:\[.*\]\s*)?;"
 )
 _MAP_FIELD = re.compile(
-    r"^\s*map\s*<\s*(\w+)\s*,\s*(\w+)\s*>\s+(\w+)\s*=\s*(\d+)\s*;"
+    r"^\s*map\s*<\s*(\w+)\s*,\s*(\w+)\s*>\s+(\w+)\s*=\s*(\d+)\s*(?:\[.*\]\s*)?;"
 )
 _CLOSE = re.compile(r"^\s*\}")
 _COMMENT = re.compile(r"^\s*//")
@@ -26,15 +26,15 @@ class ProtoFileParser:
         stack: list[dict] = []
         depth = 0
 
-        for line in lines:
+        for lineno, line in enumerate(lines, start=1):
             if _COMMENT.match(line):
                 continue
             depth += line.count("{") - line.count("}")
 
             if m := _MSG_OPEN.match(line):
-                stack.append({"kind": "message", "name": m.group(1), "depth": depth, "fields": []})
+                stack.append({"kind": "message", "name": m.group(1), "depth": depth, "fields": [], "line_start": lineno})
             elif m := _SVC_OPEN.match(line):
-                stack.append({"kind": "service", "name": m.group(1), "depth": depth, "methods": []})
+                stack.append({"kind": "service", "name": m.group(1), "depth": depth, "methods": [], "line_start": lineno})
             elif (m := _RPC.match(line)) and stack and stack[-1]["kind"] == "service":
                 stack[-1]["methods"].append(ProtoMethod(
                     name=m.group(1),
@@ -42,6 +42,7 @@ class ProtoFileParser:
                     output_type=m.group(5),
                     client_streaming=bool(m.group(2)),
                     server_streaming=bool(m.group(4)),
+                    line=lineno,
                 ))
             elif (m := _MAP_FIELD.match(line)) and stack and stack[-1]["kind"] == "message":
                 stack[-1]["fields"].append(ProtoField(
@@ -64,12 +65,17 @@ class ProtoFileParser:
             elif _CLOSE.match(line) and stack and depth < stack[-1]["depth"]:
                 frame = stack.pop()
                 if frame["kind"] == "message":
-                    messages.append(ProtoMessage(name=frame["name"], fields=frame["fields"]))
+                    messages.append(ProtoMessage(
+                        name=frame["name"], fields=frame["fields"], file_path=path,
+                        line_start=frame["line_start"], line_end=lineno,
+                    ))
                 elif frame["kind"] == "service":
                     services.append(ProtoService(
                         name=frame["name"],
                         methods=frame["methods"],
                         file_path=path,
+                        line_start=frame["line_start"],
+                        line_end=lineno,
                     ))
 
         return services, messages

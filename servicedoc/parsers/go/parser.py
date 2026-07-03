@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from pathlib import Path
 from typing import ClassVar
 
@@ -96,6 +97,21 @@ def _parse_return_types(node: Node, source: bytes) -> list[TypeRef]:
     return return_types
 
 
+_JSON_TAG_RE = re.compile(r'json:"([^"]*)"')
+
+
+def _extract_json_name(decl: Node, source: bytes) -> str | None:
+    """Extract the `json:"..."` tag value (could be "", "-", or a real name)."""
+    tag_node = next((c for c in decl.children if c.type == "raw_string_literal"), None)
+    if tag_node is None:
+        return None
+    tag_text = _node_text(tag_node, source).strip("`")
+    m = _JSON_TAG_RE.search(tag_text)
+    if not m:
+        return None
+    return m.group(1).split(",")[0]
+
+
 def _parse_struct_fields(struct_type_node: Node, source: bytes) -> list[Parameter]:
     fields: list[Parameter] = []
     body = next((c for c in struct_type_node.children if c.type == "field_declaration_list"), None)
@@ -112,12 +128,15 @@ def _parse_struct_fields(struct_type_node: Node, source: bytes) -> list[Paramete
         if not type_nodes:
             continue
         type_ref = _parse_type_ref(type_nodes[-1], source)
+        json_name = _extract_json_name(decl, source)
         if name_nodes:
             for name_node in name_nodes:
-                fields.append(Parameter(name=_node_text(name_node, source), type_ref=type_ref))
+                fields.append(Parameter(
+                    name=_node_text(name_node, source), type_ref=type_ref, json_name=json_name,
+                ))
         else:
             # embedded/anonymous field: name equals the type name
-            fields.append(Parameter(name=type_ref.name, type_ref=type_ref))
+            fields.append(Parameter(name=type_ref.name, type_ref=type_ref, json_name=json_name))
     return fields
 
 
